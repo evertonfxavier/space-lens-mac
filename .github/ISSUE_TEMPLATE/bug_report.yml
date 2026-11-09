@@ -1,0 +1,36 @@
+name: Bug report
+description: Something does not work as expected
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected and what you saw. Screenshots help.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: SpaceLens version
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version and chip
+      placeholder: "macOS 15.2, Apple M2"
+    validations:
+      required: true
+  - type: checkboxes
+    id: fda
+    attributes:
+      label: Full Disk Access
+      options:
+        - label: I granted Full Disk Access to SpaceLens
+  - type: textarea
+    id: extra
+    attributes:
+      label: Extra context
+      description: Do not paste private file names you do not want public.

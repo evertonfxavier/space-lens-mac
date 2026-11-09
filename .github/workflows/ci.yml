@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          xcode-select -p
+          swift --version
+          sw_vers
+
+      - name: Lint
+        run: make lint
+
+      - name: Test
+        run: make test
+
+      - name: Build (universal)
+        run: make universal
+
+      - name: Check architectures
+        run: |
+          archs="$(lipo -archs build/SpaceLens.app/Contents/MacOS/SpaceLens)"
+          echo "archs: $archs"
+          [[ "$archs" == *arm64* && "$archs" == *x86_64* ]]
+
+      - name: Package
+        run: ./scripts/package.sh zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SpaceLens-${{ github.sha }}
+          path: build/dist/SpaceLens-*.zip
+          retention-days: 7

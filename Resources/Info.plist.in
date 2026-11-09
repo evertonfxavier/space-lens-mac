@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key><string>pt-BR</string>
+    <key>CFBundleExecutable</key><string>SpaceLens</string>
+    <key>CFBundleIconFile</key><string>AppIcon</string>
+    <key>CFBundleIdentifier</key><string>com.everton.SpaceLens</string>
+    <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+    <key>CFBundleName</key><string>SpaceLens</string>
+    <key>CFBundleDisplayName</key><string>SpaceLens</string>
+    <key>CFBundlePackageType</key><string>APPL</string>
+    <key>CFBundleShortVersionString</key><string>__VERSION__</string>
+    <key>CFBundleVersion</key><string>__VERSION__</string>
+    <key>LSApplicationCategoryType</key><string>public.app-category.utilities</string>
+    <key>LSMinimumSystemVersion</key><string>14.0</string>
+    <key>LSMultipleInstancesProhibited</key><true/>
+    <key>NSHighResolutionCapable</key><true/>
+    <key>NSSupportsAutomaticTermination</key><false/>
+    <key>NSSupportsSuddenTermination</key><false/>
+    <key>NSDesktopFolderUsageDescription</key>
+    <string>O SpaceLens mede o tamanho dos arquivos da Mesa para mostrar o que ocupa espaço. Nenhum arquivo é aberto ou enviado.</string>
+    <key>NSDocumentsFolderUsageDescription</key>
+    <string>O SpaceLens mede o tamanho dos arquivos de Documentos para mostrar o que ocupa espaço. Nenhum arquivo é aberto ou enviado.</string>
+    <key>NSDownloadsFolderUsageDescription</key>
+    <string>O SpaceLens mede o tamanho dos arquivos de Downloads e sugere instaladores antigos. Nenhum arquivo é aberto ou enviado.</string>
+    <key>NSRemovableVolumesUsageDescription</key>
+    <string>O SpaceLens mede o tamanho dos arquivos em volumes externos quando você os escolhe para análise.</string>
+</dict>
+</plist>

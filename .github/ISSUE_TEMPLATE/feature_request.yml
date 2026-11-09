@@ -1,0 +1,15 @@
+name: Feature request
+description: Suggest an idea or a new thing the catalog should recognize
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What do you want
+      description: For a catalog entry, include the path, what creates it, and what happens if it is deleted.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
