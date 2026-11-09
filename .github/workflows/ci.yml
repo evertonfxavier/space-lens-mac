@@ -43,7 +43,7 @@ jobs:
       - name: Package
         run: ./scripts/package.sh zip
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: SpaceLens-${{ github.sha }}
           path: build/dist/SpaceLens-*.zip
