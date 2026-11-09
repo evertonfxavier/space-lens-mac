@@ -139,27 +139,27 @@ struct SizeBar: View {
 enum Fmt {
     static func size(_ bytes: Int64) -> String { ByteFormat.string(bytes) }
 
-    private static let relative: RelativeDateTimeFormatter = {
-        let f = RelativeDateTimeFormatter()
-        f.locale = Locale(identifier: "pt_BR")
-        f.unitsStyle = .full
-        return f
-    }()
+    /// `/Users/you/Projects/app` as `~/Projects/app`.
+    static func shortPath(_ path: String, home: String) -> String {
+        if path == home { return "~" }
+        return path.hasPrefix(home + "/") ? "~" + path.dropFirst(home.count) : path
+    }
 
     static func ago(_ date: Date?) -> String {
         guard let date else { return "—" }
-        return relative.localizedString(for: date, relativeTo: Date())
+        let f = RelativeDateTimeFormatter()
+        f.locale = Localizer.shared.locale
+        f.unitsStyle = .full
+        return f.localizedString(for: date, relativeTo: Date())
     }
 
-    private static let dateTime: DateFormatter = {
+    static func dateTimeString(_ date: Date) -> String {
         let f = DateFormatter()
-        f.locale = Locale(identifier: "pt_BR")
+        f.locale = Localizer.shared.locale
         f.dateStyle = .medium
         f.timeStyle = .short
-        return f
-    }()
-
-    static func dateTimeString(_ date: Date) -> String { dateTime.string(from: date) }
+        return f.string(from: date)
+    }
 }
 
 func revealInFinder(_ path: String) {

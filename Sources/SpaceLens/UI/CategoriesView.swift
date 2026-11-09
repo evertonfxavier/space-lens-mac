@@ -40,7 +40,7 @@ struct CategoriesView: View {
                 }
             }
         } else {
-            EmptyAnalysis(text: "Analise o disco para ver o consumo por categoria.")
+            EmptyAnalysis(text: L("Analise o disco para ver o consumo por categoria."))
         }
     }
 }
@@ -60,12 +60,12 @@ struct CategoryDetail: View {
                     Spacer()
                     Text(Fmt.size(total)).font(.title3).monospacedDigit()
                 }
-                Text("Os maiores itens desta categoria. Clique em “Explorar” para abrir a pasta.").font(.caption)
+                Text(L("Os maiores itens desta categoria. Clique em “Explorar” para abrir a pasta.")).font(.caption)
                     .foregroundStyle(.secondary)
             }.padding(16)
             Divider()
             if items.isEmpty {
-                Text("Esta categoria é feita de muitos arquivos pequenos.").foregroundStyle(.secondary).padding(16)
+                Text(L("Esta categoria é feita de muitos arquivos pequenos.")).foregroundStyle(.secondary).padding(16)
                 Spacer()
             } else {
                 List(items) { item in
@@ -84,13 +84,13 @@ struct CategoryDetail: View {
                         Text(Fmt.size(item.size)).monospacedDigit().frame(width: 76, alignment: .trailing)
                     }
                     .contextMenu {
-                        Button("Mostrar no Finder") { revealInFinder(item.path) }
-                        Button("Abrir no Explorar") {
+                        Button(L("Mostrar no Finder")) { revealInFinder(item.path) }
+                        Button(L("Abrir no Explorar")) {
                             model.explorerPath =
                                 item.isDirectory ? item.path : (item.path as NSString).deletingLastPathComponent
                             model.section = .explorer
                         }
-                        Button("Copiar caminho") { copyToPasteboard(item.path) }
+                        Button(L("Copiar caminho")) { copyToPasteboard(item.path) }
                     }
                 }
             }

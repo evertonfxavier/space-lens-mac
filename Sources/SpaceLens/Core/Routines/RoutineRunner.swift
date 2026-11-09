@@ -101,20 +101,21 @@ public final class RoutineRunner: @unchecked Sendable {
 
         case .lowSpaceAlert(let gb):
             guard let usage = disk() else {
-                return Outcome(message: "Não consegui ler o espaço do disco.", failed: true)
+                return Outcome(message: L("Não consegui ler o espaço do disco."), failed: true)
             }
             guard usage.availableImportant < Int64(gb) << 30 else {
-                return Outcome(message: "Espaço livre ok: \(ByteFormat.string(usage.availableImportant)).")
+                return Outcome(message: L("Espaço livre ok: %@.", ByteFormat.string(usage.availableImportant)))
             }
             let selection = select(
                 roots: safeCacheRoots(), keep: { Self.isPlainSafeCache($0) }, age: { _ in nil }, olderThan: 0, at: date)
             let potential = selection.reduce(0) { $0 + $1.items.reduce(0) { $0 + $1.size } }
             let hint =
                 potential > 0
-                ? "Dá para liberar \(ByteFormat.string(potential)) com segurança."
-                : "Abra o SpaceLens para ver o que ocupa espaço."
+                ? L("Dá para liberar %@ com segurança.", ByteFormat.string(potential))
+                : L("Abra o SpaceLens para ver o que ocupa espaço.")
             return Outcome(
-                message: "Restam \(ByteFormat.string(usage.availableImportant)) livres (limite \(gb) GB). \(hint)",
+                message: L(
+                    "Restam %@ livres (limite %lld GB). %@", ByteFormat.string(usage.availableImportant), gb, hint),
                 potential: potential, count: selection.reduce(0) { $0 + $1.items.count }, notable: true)
         }
     }
@@ -165,11 +166,12 @@ public final class RoutineRunner: @unchecked Sendable {
     private func finish(_ routine: Routine, _ selection: Selection) async -> Outcome {
         let potential = selection.reduce(0) { $0 + $1.items.reduce(0) { $0 + $1.size } }
         let count = selection.reduce(0) { $0 + $1.items.count }
-        guard count > 0 else { return Outcome(message: "Nada para limpar.", applied: routine.apply) }
+        guard count > 0 else { return Outcome(message: L("Nada para limpar."), applied: routine.apply) }
         guard routine.apply else {
             return Outcome(
-                message:
-                    "Poderia liberar \(ByteFormat.string(potential)) em \(count) item(ns). A rotina está em modo “só avisar”.",
+                message: L(
+                    "Poderia liberar %@ em %lld item(ns). A rotina está em modo “só avisar”.",
+                    ByteFormat.string(potential), count),
                 potential: potential, count: count, notable: true)
         }
         var outcome = Outcome(message: "", applied: true)
@@ -183,11 +185,13 @@ public final class RoutineRunner: @unchecked Sendable {
         }
         outcome.message =
             outcome.count == 0
-            ? "Nada foi removido." : "Liberou \(ByteFormat.string(outcome.freed)) em \(outcome.count) item(ns)."
+            ? L("Nada foi removido.")
+            : L("Liberou %@ em %lld item(ns).", ByteFormat.string(outcome.freed), outcome.count)
         if outcome.trashed > 0 {
-            outcome.message += " \(ByteFormat.string(outcome.trashed)) foram para a Lixeira (esvazie para liberar)."
+            outcome.message +=
+                " " + L("%@ foram para a Lixeira (esvazie para liberar).", ByteFormat.string(outcome.trashed))
         }
-        if failures > 0 { outcome.message += " \(failures) item(ns) não puderam ser removidos." }
+        if failures > 0 { outcome.message += " " + L("%lld item(ns) não puderam ser removidos.", failures) }
         outcome.failed = failures > 0 && outcome.count == 0
         outcome.notable = outcome.freed > 0 || outcome.trashed > 0
         return outcome

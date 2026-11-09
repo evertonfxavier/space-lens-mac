@@ -6,6 +6,8 @@ public struct CategoryItem: Identifiable, Sendable, Equatable {
     public var isDirectory: Bool
     public var safety: Safety
     public var title: String?
+    /// The catalog entry that gave it a title, so the title can be translated again when the language changes.
+    public var entryID: String?
     public var id: String { path }
     public var name: String { (path as NSString).lastPathComponent }
 }
@@ -17,6 +19,27 @@ public struct Analysis: Sendable {
     public var topItems: [Category: [CategoryItem]] = [:]
 
     public var scannedBytes: Int64 { categoryBytes.values.reduce(0, +) }
+
+    /// The same analysis with every catalog text in the current language. Used when the language changes: a new
+    /// analysis would resurrect items that were already cleaned.
+    public func relocalized(home: String) -> Analysis {
+        let texts = Catalog.texts(home: home)
+        var copy = self
+        for index in copy.recommendations.indices {
+            guard let text = texts[copy.recommendations[index].id] else { continue }
+            copy.recommendations[index].title = text.title
+            copy.recommendations[index].explanation = text.explanation
+            copy.recommendations[index].consequence = text.consequence
+        }
+        for category in copy.topItems.keys {
+            for index in copy.topItems[category]!.indices {
+                if let id = copy.topItems[category]![index].entryID, let text = texts[id] {
+                    copy.topItems[category]![index].title = text.title
+                }
+            }
+        }
+        return copy
+    }
 
     /// What you can free without losing anything and without a password.
     public var safeFreeable: Int64 {
@@ -37,6 +60,16 @@ public final class Analyzer: @unchecked Sendable {
 
     private struct Accumulator {
         var recommendation: Recommendation
+    }
+
+    public static var largeOldText: (title: String, explanation: String, consequence: String) {
+        (
+            L("Arquivos grandes sem uso há mais de 6 meses"),
+            L(
+                "Arquivos acima de 500 MB que você não abre nem altera há meio ano. Costumam ser vídeos, imagens de disco e arquivos compactados."
+            ),
+            L("Vão para a Lixeira, de onde você pode recuperar. Confira cada um: só você sabe se importa.")
+        )
     }
 
     public static let largeOldSize: Int64 = 500 << 20
@@ -152,7 +185,7 @@ public final class Analyzer: @unchecked Sendable {
             tops[cls.category, default: []].append(
                 CategoryItem(
                     path: node.path, size: node.size, isDirectory: node.isDirectory, safety: cls.safety,
-                    title: cls.title))
+                    title: cls.title, entryID: cls.entryID))
         }
 
         func collect(_ matched: Matched, _ node: FileNode) {
@@ -217,11 +250,8 @@ public final class Analyzer: @unchecked Sendable {
         if !largeOld.isEmpty {
             recommendations.append(
                 Recommendation(
-                    id: "large.old", title: "Arquivos grandes sem uso há mais de 6 meses",
-                    explanation:
-                        "Arquivos acima de 500 MB que você não abre nem altera há meio ano. Costumam ser vídeos, imagens de disco e arquivos compactados.",
-                    consequence:
-                        "Vão para a Lixeira, de onde você pode recuperar. Confira cada um: só você sabe se importa.",
+                    id: "large.old", title: Self.largeOldText.title, explanation: Self.largeOldText.explanation,
+                    consequence: Self.largeOldText.consequence,
                     category: .other, safety: .review, mode: .trash, items: largeOld, command: nil,
                     needsAdmin: false, preselect: false, sizeIsReference: false))
         }

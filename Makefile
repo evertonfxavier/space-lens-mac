@@ -1,6 +1,6 @@
 VERSION := $(shell tr -d '[:space:]' < VERSION)
 
-.PHONY: build run install test format lint check icon snapshots zip dmg universal release-local clean
+.PHONY: build run install test format lint check icon snapshots screenshots zip dmg universal release-local clean
 
 build:
 	./scripts/build.sh
@@ -37,6 +37,10 @@ snapshots:
 	rm -rf build/snapshots && mkdir -p build/snapshots
 	SPACELENS_SNAPSHOT_DIR=$(CURDIR)/build/snapshots build/SpaceLens.app/Contents/MacOS/SpaceLens
 	@echo "✓ build/snapshots/*.png"
+
+# README screenshots in English and Portuguese (docs/screenshots).
+screenshots:
+	./scripts/screenshots.sh
 
 zip: build
 	./scripts/package.sh zip

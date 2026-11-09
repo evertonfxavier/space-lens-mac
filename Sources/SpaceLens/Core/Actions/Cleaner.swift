@@ -146,7 +146,7 @@ public final class Cleaner: @unchecked Sendable {
         var result = CleanupResult()
         let valid = selected.filter { known.contains($0.path) }
         for item in selected where !known.contains(item.path) {
-            result.failures.append(CleanupFailure(path: item.path, reason: "Item não pertence à recomendação."))
+            result.failures.append(CleanupFailure(path: item.path, reason: L("Item não pertence à recomendação.")))
         }
         guard !valid.isEmpty else { return result }
 
@@ -201,7 +201,7 @@ public final class Cleaner: @unchecked Sendable {
         let batches = stride(from: 0, to: needsAdmin.count, by: 100).map {
             Array(needsAdmin[$0..<min($0 + 100, needsAdmin.count)])
         }
-        let prompt = "O SpaceLens precisa da sua permissão para apagar \(needsAdmin.count) item(ns) de sistema."
+        let prompt = L("O SpaceLens precisa da sua permissão para apagar %lld item(ns) de sistema.", needsAdmin.count)
         do {
             try await privileged.run(
                 commands: batches.map { ["/bin/rm", "-rf", "--"] + $0.map(\.path) }, prompt: prompt)
@@ -215,7 +215,7 @@ public final class Cleaner: @unchecked Sendable {
                 result.failures.append(
                     CleanupFailure(
                         path: item.path,
-                        reason: result.cancelled ? "Autorização cancelada." : "Não foi possível apagar."))
+                        reason: result.cancelled ? L("Autorização cancelada.") : L("Não foi possível apagar.")))
             } else {
                 result.freed += item.size
                 result.removedPaths.append(item.path)
@@ -231,7 +231,8 @@ public final class Cleaner: @unchecked Sendable {
     ) async -> CleanupResult {
         var result = start
         guard let executable = commands.resolve(command.tool) else {
-            result.failures.append(CleanupFailure(path: command.tool, reason: "“\(command.tool)” não está instalado."))
+            result.failures.append(
+                CleanupFailure(path: command.tool, reason: L("“%@” não está instalado.", command.tool)))
             return result
         }
         let argumentsPerItem = items.contains { $0.argument != nil }
@@ -241,14 +242,14 @@ public final class Cleaner: @unchecked Sendable {
 
         if command.admin {
             guard allowAdmin else {
-                result.failures.append(CleanupFailure(path: command.display, reason: "Precisa de autorização."))
+                result.failures.append(CleanupFailure(path: command.display, reason: L("Precisa de autorização.")))
                 return result
             }
             result.usedAdmin = true
             do {
                 try await privileged.run(
                     commands: invocations.map { [executable] + $0.1 },
-                    prompt: "O SpaceLens precisa da sua permissão para executar “\(command.display)”.")
+                    prompt: L("O SpaceLens precisa da sua permissão para executar “%@”.", command.display))
                 result.removedPaths.append(contentsOf: invocations.map { $0.0?.path ?? command.display })
             } catch PrivilegedError.cancelled {
                 result.cancelled = true
@@ -266,7 +267,8 @@ public final class Cleaner: @unchecked Sendable {
             } else {
                 let tail = outcome.output.trimmingCharacters(in: .whitespacesAndNewlines)
                 result.failures.append(
-                    CleanupFailure(path: command.display, reason: tail.isEmpty ? "Código \(outcome.status)." : tail))
+                    CleanupFailure(
+                        path: command.display, reason: tail.isEmpty ? L("Código %lld.", Int(outcome.status)) : tail))
             }
         }
         result.freed = max(0, freeBytes() - before)
@@ -285,7 +287,7 @@ public final class Cleaner: @unchecked Sendable {
 
     static func describe(_ error: Error, path: String) -> String {
         if isPermission(error) {
-            return "Permissão negada. Conceda “Acesso Total ao Disco” ao SpaceLens em Ajustes do Sistema."
+            return L("Permissão negada. Conceda “Acesso Total ao Disco” ao SpaceLens em Ajustes do Sistema.")
         }
         return (error as NSError).localizedDescription
     }

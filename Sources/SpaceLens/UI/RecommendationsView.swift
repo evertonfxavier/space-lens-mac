@@ -5,11 +5,11 @@ struct RecommendationsView: View {
 
     var body: some View {
         if model.analysis == nil {
-            EmptyAnalysis(text: "Analise o disco para ver o que você pode apagar.")
+            EmptyAnalysis(text: L("Analise o disco para ver o que você pode apagar."))
         } else if model.recommendations.isEmpty {
             ContentUnavailableView(
-                "Nada para limpar", systemImage: "checkmark.seal",
-                description: Text("Não encontrei nada que valha a pena apagar. Seu Mac está em ordem."))
+                L("Nada para limpar"), systemImage: "checkmark.seal",
+                description: Text(L("Não encontrei nada que valha a pena apagar. Seu Mac está em ordem.")))
         } else {
             List {
                 legend
@@ -21,7 +21,7 @@ struct RecommendationsView: View {
                         } header: {
                             HStack(spacing: 6) {
                                 Image(systemName: safety.icon).foregroundStyle(safety.color)
-                                Text(safety == .safe ? "Pode apagar com segurança" : "Revise antes de apagar")
+                                Text(safety == .safe ? L("Pode apagar com segurança") : L("Revise antes de apagar"))
                                     .font(.headline)
                             }.padding(.vertical, 4)
                         }
@@ -35,7 +35,9 @@ struct RecommendationsView: View {
 
     private var legend: some View {
         Text(
-            "Cada item explica o que é e o que acontece se você apagar. Itens “Revise antes” começam desmarcados e, por padrão, vão para a Lixeira. O SpaceLens nunca toca em sistema, chaves, iCloud e Fotos."
+            L(
+                "Cada item explica o que é e o que acontece se você apagar. Itens “Revise antes” começam desmarcados e, por padrão, vão para a Lixeira. O SpaceLens nunca toca em sistema, chaves, iCloud e Fotos."
+            )
         )
         .font(.callout).foregroundStyle(.secondary)
         .listRowSeparator(.hidden)
@@ -49,13 +51,13 @@ struct RecommendationsView: View {
 
     private var footer: some View {
         HStack {
-            Text("Marcado para limpar: **\(Fmt.size(model.totalSelectedSize))**")
+            Text(LocalizedStringKey(L("Marcado para limpar: **%@**", Fmt.size(model.totalSelectedSize))))
             Spacer()
             let quick = model.quickCleanSize
             Button {
                 Task { await model.quickClean() }
             } label: {
-                Label("Limpar o seguro marcado (\(Fmt.size(quick)))", systemImage: "sparkles")
+                Label(L("Limpar o seguro marcado (%@)", Fmt.size(quick)), systemImage: "sparkles")
             }
             .buttonStyle(.borderedProminent).disabled(quick == 0 || model.isBusy)
         }
@@ -69,11 +71,11 @@ struct EmptyAnalysis: View {
 
     var body: some View {
         ContentUnavailableView {
-            Label("Sem análise ainda", systemImage: "magnifyingglass")
+            Label(L("Sem análise ainda"), systemImage: "magnifyingglass")
         } description: {
             Text(text)
         } actions: {
-            Button("Analisar agora") { model.startScan() }.buttonStyle(.borderedProminent).disabled(model.isScanning)
+            Button(L("Analisar agora")) { model.startScan() }.buttonStyle(.borderedProminent).disabled(model.isScanning)
         }
     }
 }
@@ -88,12 +90,12 @@ struct RecommendationRow: View {
             VStack(alignment: .leading, spacing: 10) {
                 consequence
                 HStack(spacing: 12) {
-                    Button("Marcar todos") { model.selectAll(rec, true) }
-                    Button("Desmarcar") { model.selectAll(rec, false) }
+                    Button(L("Marcar todos")) { model.selectAll(rec, true) }
+                    Button(L("Desmarcar")) { model.selectAll(rec, false) }
                 }.buttonStyle(.link).font(.caption)
                 ForEach(rec.items.prefix(100)) { item in ItemRow(rec: rec, item: item) }
                 if rec.items.count > 100 {
-                    Text("+ \(rec.items.count - 100) itens menores").font(.caption).foregroundStyle(.secondary)
+                    Text(L("+ %@ itens menores", rec.items.count - 100)).font(.caption).foregroundStyle(.secondary)
                 }
             }
             .padding(.top, 8).padding(.leading, 4)
@@ -109,9 +111,9 @@ struct RecommendationRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     Text(rec.title).font(.headline)
-                    if rec.needsAdmin { Badge(text: "Pede senha ou digital", color: .purple, icon: "lock.fill") }
+                    if rec.needsAdmin { Badge(text: L("Pede senha ou digital"), color: .purple, icon: "lock.fill") }
                     if rec.isCommand && !rec.needsAdmin {
-                        Badge(text: "Usa \(rec.command?.tool ?? "")", color: .gray, icon: "terminal")
+                        Badge(text: L("Usa %@", rec.command?.tool ?? ""), color: .gray, icon: "terminal")
                     }
                     Badge(
                         text: modeText, color: .secondary,
@@ -125,7 +127,7 @@ struct RecommendationRow: View {
             VStack(alignment: .trailing, spacing: 6) {
                 Text(
                     rec.sizeIsReference && rec.totalSize == 0
-                        ? "—" : (rec.sizeIsReference ? "até " : "") + Fmt.size(rec.totalSize)
+                        ? "—" : (rec.sizeIsReference ? L("até ") : "") + Fmt.size(rec.totalSize)
                 )
                 .font(.title3.weight(.semibold)).monospacedDigit()
                 Button {
@@ -141,15 +143,15 @@ struct RecommendationRow: View {
     }
 
     private var modeText: String {
-        if rec.needsAdmin { return "Apaga de vez" }
-        if rec.isCommand { return "Executa comando" }
-        return (rec.mode == .trash || model.settings.alwaysUseTrash) ? "Vai para a Lixeira" : "Apaga de vez"
+        if rec.needsAdmin { return L("Apaga de vez") }
+        if rec.isCommand { return L("Executa comando") }
+        return (rec.mode == .trash || model.settings.alwaysUseTrash) ? L("Vai para a Lixeira") : L("Apaga de vez")
     }
 
     private var cleanLabel: String {
         let n = model.selectedItems(rec).count
-        if rec.isCommand { return rec.id == "snapshots.tm" ? "Apagar \(n)" : "Executar" }
-        return n == 0 ? "Nada marcado" : "Limpar \(Fmt.size(model.selectedSize(rec)))"
+        if rec.isCommand { return rec.id == "snapshots.tm" ? L("Apagar %lld", n) : L("Executar") }
+        return n == 0 ? L("Nada marcado") : L("Limpar %@", Fmt.size(model.selectedSize(rec)))
     }
 
     private var consequence: some View {
@@ -158,7 +160,7 @@ struct RecommendationRow: View {
                 Label(rec.consequence, systemImage: "info.circle").font(.callout)
             }
             if let command = rec.command {
-                Label("Comando: \(command.display)", systemImage: "terminal").font(.caption.monospaced())
+                Label(L("Comando: %@", command.display), systemImage: "terminal").font(.caption.monospaced())
                     .foregroundStyle(.secondary)
             }
         }
@@ -185,7 +187,7 @@ struct ItemRow: View {
                 Text(item.label.map { "\(item.name) — \($0)" } ?? item.name).lineLimit(1).truncationMode(.middle)
                 Text(
                     item.path.hasPrefix("snapshot:")
-                        ? "Instantâneo local"
+                        ? L("Instantâneo local")
                         : (item.path as NSString).deletingLastPathComponent.replacingOccurrences(
                             of: model.home, with: "~")
                 )
@@ -202,7 +204,7 @@ struct ItemRow: View {
                 } label: {
                     Image(systemName: "magnifyingglass.circle")
                 }
-                .buttonStyle(.borderless).help("Mostrar no Finder")
+                .buttonStyle(.borderless).help(L("Mostrar no Finder"))
             }
         }
     }

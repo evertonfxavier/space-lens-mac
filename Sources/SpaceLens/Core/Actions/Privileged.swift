@@ -52,14 +52,16 @@ public struct AdminPromptRunner: PrivilegedRunner {
     public func run(commands: [[String]], prompt: String) async throws {
         let source = Self.script(commands: commands, prompt: prompt)
         try await MainActor.run {
-            guard let script = NSAppleScript(source: source) else { throw PrivilegedError.failed("Script inválido.") }
+            guard let script = NSAppleScript(source: source) else {
+                throw PrivilegedError.failed(L("Script inválido."))
+            }
             var error: NSDictionary?
             script.executeAndReturnError(&error)
             if let error {
                 let number = error[NSAppleScript.errorNumber] as? Int
                 if number == -128 { throw PrivilegedError.cancelled }
                 throw PrivilegedError.failed(
-                    (error[NSAppleScript.errorMessage] as? String) ?? "Falha ao executar com privilégios.")
+                    (error[NSAppleScript.errorMessage] as? String) ?? L("Falha ao executar com privilégios."))
             }
         }
     }

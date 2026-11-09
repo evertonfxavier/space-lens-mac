@@ -13,8 +13,8 @@ struct OverviewView: View {
                 } else if model.isScanning {
                     Card {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("Analisando seu disco…").font(.title3.weight(.semibold))
-                            Text("Os resultados aparecem aqui assim que terminar. Você pode continuar usando o Mac.")
+                            Text(L("Analisando seu disco…")).font(.title3.weight(.semibold))
+                            Text(L("Os resultados aparecem aqui assim que terminar. Você pode continuar usando o Mac."))
                                 .foregroundStyle(.secondary)
                         }
                     }
@@ -37,19 +37,21 @@ struct WelcomeCard: View {
         Card {
             VStack(alignment: .leading, spacing: 14) {
                 Image(systemName: "internaldrive").font(.system(size: 34)).foregroundStyle(.tint)
-                Text("Veja o que ocupa o espaço do seu Mac").font(.title2.weight(.semibold))
+                Text(L("Veja o que ocupa o espaço do seu Mac")).font(.title2.weight(.semibold))
                 Text(
-                    "O SpaceLens analisa o disco, separa tudo por categoria e diz o que você pode apagar sem medo, o que merece uma olhada e o que não deve ser tocado. Nada é apagado sem sua confirmação."
+                    L(
+                        "O SpaceLens analisa o disco, separa tudo por categoria e diz o que você pode apagar sem medo, o que merece uma olhada e o que não deve ser tocado. Nada é apagado sem sua confirmação."
+                    )
                 )
                 .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 HStack {
-                    Picker("Analisar", selection: $model.settings.scope) {
+                    Picker(L("Analisar"), selection: $model.settings.scope) {
                         ForEach(AppSettings.ScanScope.allCases, id: \.self) { Text($0.title).tag($0) }
                     }.pickerStyle(.segmented).frame(width: 320).labelsHidden()
                     Button {
                         model.startScan()
                     } label: {
-                        Label("Analisar agora", systemImage: "magnifyingglass")
+                        Label(L("Analisar agora"), systemImage: "magnifyingglass")
                     }
                     .buttonStyle(.borderedProminent).controlSize(.large)
                 }
@@ -64,12 +66,17 @@ struct LastScanCard: View {
     var body: some View {
         Card {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Última análise").font(.headline)
-                Text("\(Fmt.dateTimeString(summary.date)) · \(summary.scope.title) · \(Int(summary.duration)) s")
-                    .foregroundStyle(.secondary)
+                Text(L("Última análise")).font(.headline)
+                Text(
+                    verbatim:
+                        "\(Fmt.dateTimeString(summary.date)) · \(summary.scope.title) · \(Int(summary.duration)) s"
+                )
+                .foregroundStyle(.secondary)
                 if summary.safeFreeable > 0 {
                     Text(
-                        "Na época havia \(Fmt.size(summary.safeFreeable)) para liberar com segurança. Analise de novo para ver o estado atual."
+                        L(
+                            "Na época havia %@ para liberar com segurança. Analise de novo para ver o estado atual.",
+                            Fmt.size(summary.safeFreeable))
                     )
                     .font(.callout)
                 }
@@ -95,7 +102,7 @@ struct StorageCard: View {
             out.append(
                 Segment(
                     id: "unscanned", color: Color(nsColor: .tertiaryLabelColor), fraction: Double(unscanned) / total,
-                    label: "Fora da análise: \(Fmt.size(unscanned))"))
+                    label: L("Fora da análise: %@", Fmt.size(unscanned))))
         }
         return out
     }
@@ -105,8 +112,9 @@ struct StorageCard: View {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .firstTextBaseline) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Macintosh HD").font(.title3.weight(.semibold))
-                        Text("\(Fmt.size(usage.used)) usados de \(Fmt.size(usage.total))").foregroundStyle(.secondary)
+                        Text(verbatim: "Macintosh HD").font(.title3.weight(.semibold))
+                        Text(L("%@ usados de %@", Fmt.size(usage.used), Fmt.size(usage.total))).foregroundStyle(
+                            .secondary)
                     }
                     Spacer()
                     VStack(alignment: .trailing, spacing: 2) {
@@ -116,7 +124,7 @@ struct StorageCard: View {
                         .foregroundStyle(model.isLowOnSpace ? .red : .primary)
                         Text(
                             usage.purgeable > 0
-                                ? "livres (\(Fmt.size(usage.purgeable)) liberáveis pelo macOS)" : "livres"
+                                ? L("livres (%@ liberáveis pelo macOS)", Fmt.size(usage.purgeable)) : "livres"
                         )
                         .font(.caption).foregroundStyle(.secondary)
                     }
@@ -124,7 +132,9 @@ struct StorageCard: View {
                 SegmentedBar(segments: segments, height: 18)
                 if model.settings.scope == .home {
                     Text(
-                        "A análise cobre sua pasta pessoal. O restante do disco (sistema, apps e outros usuários) aparece como “fora da análise”. Mude em Ajustes para analisar o disco inteiro."
+                        L(
+                            "A análise cobre sua pasta pessoal. O restante do disco (sistema, apps e outros usuários) aparece como “fora da análise”. Mude em Ajustes para analisar o disco inteiro."
+                        )
                     )
                     .font(.caption).foregroundStyle(.secondary)
                 }
@@ -144,15 +154,17 @@ struct FreeableCard: View {
                 Image(systemName: "checkmark.shield.fill").font(.system(size: 34)).foregroundStyle(.green)
                 VStack(alignment: .leading, spacing: 4) {
                     if analysis.safeFreeable > 0 {
-                        Text("Dá para liberar \(Fmt.size(analysis.safeFreeable)) com segurança").font(
+                        Text(L("Dá para liberar %@ com segurança", Fmt.size(analysis.safeFreeable))).font(
                             .title3.weight(.semibold))
                         Text(
-                            "Caches, logs, builds e outros arquivos que o macOS e seus apps recriam sozinhos. Nada seu é perdido."
+                            L(
+                                "Caches, logs, builds e outros arquivos que o macOS e seus apps recriam sozinhos. Nada seu é perdido."
+                            )
                         )
                         .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     } else {
-                        Text("Nada seguro para limpar agora").font(.title3.weight(.semibold))
-                        Text("Veja as recomendações para itens que dependem de você.").foregroundStyle(.secondary)
+                        Text(L("Nada seguro para limpar agora")).font(.title3.weight(.semibold))
+                        Text(L("Veja as recomendações para itens que dependem de você.")).foregroundStyle(.secondary)
                     }
                 }
                 Spacer(minLength: 12)
@@ -161,12 +173,12 @@ struct FreeableCard: View {
                         Button {
                             Task { await model.quickClean() }
                         } label: {
-                            Label("Limpar \(Fmt.size(quick))", systemImage: "sparkles").frame(minWidth: 140)
+                            Label(L("Limpar %@", Fmt.size(quick)), systemImage: "sparkles").frame(minWidth: 140)
                         }
                         .buttonStyle(.borderedProminent).controlSize(.large)
-                        .help("Limpa só o que está marcado como seguro e não pede senha")
+                        .help(L("Limpa só o que está marcado como seguro e não pede senha"))
                     }
-                    Button("Ver detalhes") { model.section = .recommendations }
+                    Button(L("Ver detalhes")) { model.section = .recommendations }
                 }
             }
         }
@@ -181,7 +193,7 @@ struct CategoryGrid: View {
         let items = analysis.categoryBytes.filter { $0.value > 0 }.sorted { $0.value > $1.value }
         let biggest = Double(items.first?.value ?? 1)
         VStack(alignment: .leading, spacing: 10) {
-            Text("Por categoria").font(.headline)
+            Text(L("Por categoria")).font(.headline)
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 260), spacing: 12)], spacing: 12) {
                 ForEach(items, id: \.key) { category, bytes in
                     Button {

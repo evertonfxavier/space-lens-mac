@@ -99,17 +99,25 @@ public enum TimeMachineSnapshots {
             .filter { $0.range(of: #"^\d{4}-\d{2}-\d{2}-\d{6}$"#, options: .regularExpression) != nil }
     }
 
+    public static var text: (title: String, explanation: String, consequence: String) {
+        (
+            L("Instantâneos locais do Time Machine"),
+            L(
+                "Cópias de segurança que o Time Machine guarda no próprio Mac enquanto o disco de backup não está conectado. O macOS apaga sozinho quando falta espaço, mas elas podem ocupar muitos GB antes disso."
+            ),
+            L(
+                "Pede sua senha ou digital. Você perde só a possibilidade de restaurar versões antigas deste Mac sem o disco de backup."
+            )
+        )
+    }
+
     public static func recommendation(dates: [String]) -> Recommendation? {
         guard !dates.isEmpty else { return nil }
         let items = dates.sorted().map {
             CleanupItem(path: "snapshot:\($0)", size: 0, label: $0, argument: $0, preselected: false)
         }
         return Recommendation(
-            id: "snapshots.tm", title: "Instantâneos locais do Time Machine",
-            explanation:
-                "Cópias de segurança que o Time Machine guarda no próprio Mac enquanto o disco de backup não está conectado. O macOS apaga sozinho quando falta espaço, mas elas podem ocupar muitos GB antes disso.",
-            consequence:
-                "Pede sua senha ou digital. Você perde só a possibilidade de restaurar versões antigas deste Mac sem o disco de backup.",
+            id: "snapshots.tm", title: text.title, explanation: text.explanation, consequence: text.consequence,
             category: .backups, safety: .review, mode: .delete, items: items,
             command: CommandSpec(tool: "tmutil", args: ["deletelocalsnapshots"], admin: true), needsAdmin: true,
             preselect: false, sizeIsReference: true)

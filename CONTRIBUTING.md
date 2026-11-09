@@ -31,8 +31,19 @@ make snapshots  # screenshots with demo data in build/snapshots
   test, and when in doubt the entry is `review`, not `safe`.
 - `Core` must not import SwiftUI or AppKit UI code (the tests compile `Core` alone).
 - Unattended routines never ask for a password and never touch system items.
-- No network access, no telemetry.
-- User-facing strings are in Brazilian Portuguese for now. Localization contributions are welcome.
+- No telemetry. The only network request is the optional, anonymous update check against the GitHub releases API.
+- **Every user-facing string goes through `L("…")`** (never a bare `Text("literal")`, SwiftUI would look it up in the
+  wrong place). The Brazilian Portuguese text is the key, and `Resources/Localization/<lang>.lproj/Localizable.strings`
+  holds the English and Spanish versions. Format strings use `%@` / `%lld` and positional `%1$@` when the word order
+  differs. A test fails if a key used in the code is missing from a table, if a table keeps a key nobody uses, if the
+  placeholders differ, or if a view hard-codes text.
+
+## Adding a language
+
+1. Copy `Resources/Localization/en.lproj` to `<code>.lproj` and translate the values (keep the keys).
+2. Add the case to `AppLanguage` in `Sources/SpaceLens/Core/Localization/Localizer.swift` (its `code`, `nativeName`
+   and the `resolve` rule), and list the language in `CFBundleLocalizations` in `Resources/Info.plist.in`.
+3. Add the code to the language list in `Tests/LocalizationTests.swift` and run `make check`.
 
 ## Releasing (maintainers)
 

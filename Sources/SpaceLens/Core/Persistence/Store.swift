@@ -5,7 +5,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         case home
         case wholeDisk
 
-        public var title: String { self == .home ? "Minha pasta pessoal" : "Disco inteiro" }
+        public var title: String { self == .home ? L("Minha pasta pessoal") : L("Disco inteiro") }
     }
 
     /// Ask for Touch ID / password before cleaning (not for unattended routines, which only do safe things).
@@ -18,6 +18,15 @@ public struct AppSettings: Codable, Equatable, Sendable {
     /// Move to the Trash even what the catalog says is safe to delete for good.
     public var alwaysUseTrash = false
     public var notifications = true
+    /// Interface language. `.system` follows the macOS language list.
+    public var language: AppLanguage = .system
+    /// The menu bar icon and its popover. Off keeps SpaceLens in the Dock instead.
+    public var showMenuBarItem = true
+    /// Look for a newer GitHub release once a day.
+    public var checkForUpdates = true
+    public var lastUpdateCheck: Date?
+    /// Tag of the release whose banner you dismissed. A newer release shows its banner again.
+    public var dismissedUpdate: String?
 
     public init() {}
 
@@ -33,11 +42,16 @@ public struct AppSettings: Codable, Equatable, Sendable {
         lowSpaceThresholdGB = try c.decodeIfPresent(Int.self, forKey: .lowSpaceThresholdGB) ?? lowSpaceThresholdGB
         alwaysUseTrash = try c.decodeIfPresent(Bool.self, forKey: .alwaysUseTrash) ?? alwaysUseTrash
         notifications = try c.decodeIfPresent(Bool.self, forKey: .notifications) ?? notifications
+        language = try c.decodeIfPresent(AppLanguage.self, forKey: .language) ?? language
+        showMenuBarItem = try c.decodeIfPresent(Bool.self, forKey: .showMenuBarItem) ?? showMenuBarItem
+        checkForUpdates = try c.decodeIfPresent(Bool.self, forKey: .checkForUpdates) ?? checkForUpdates
+        lastUpdateCheck = try c.decodeIfPresent(Date.self, forKey: .lastUpdateCheck)
+        dismissedUpdate = try c.decodeIfPresent(String.self, forKey: .dismissedUpdate)
     }
 
     private enum Keys: String, CodingKey {
         case requireAuthToClean, scope, autoScanHours, showFreeSpaceInMenuBar, lowSpaceThresholdGB, alwaysUseTrash,
-            notifications
+            notifications, language, showMenuBarItem, checkForUpdates, lastUpdateCheck, dismissedUpdate
     }
 }
 

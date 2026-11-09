@@ -7,21 +7,23 @@ struct RoutinesView: View {
     var body: some View {
         List {
             Text(
-                "Rotinas rodam sozinhas enquanto o SpaceLens estiver aberto na barra de menus (ative “Abrir ao iniciar sessão” nos Ajustes). Elas nunca pedem senha, só mexem em itens recriáveis ou mandam para a Lixeira, e mostram o resultado no Histórico. “Só avisar” apenas calcula quanto daria para liberar."
+                L(
+                    "Rotinas rodam sozinhas enquanto o SpaceLens estiver aberto na barra de menus (ative “Abrir ao iniciar sessão” nos Ajustes). Elas nunca pedem senha, só mexem em itens recriáveis ou mandam para a Lixeira, e mostram o resultado no Histórico. “Só avisar” apenas calcula quanto daria para liberar."
+                )
             )
             .font(.callout).foregroundStyle(.secondary).listRowSeparator(.hidden)
             ForEach(model.routines) { routine in RoutineRow(routine: routine, edit: { editing = routine }) }
             if model.routines.isEmpty {
-                Text("Nenhuma rotina. Crie uma pelo botão “Nova rotina”.").foregroundStyle(.secondary)
+                Text(L("Nenhuma rotina. Crie uma pelo botão “Nova rotina”.")).foregroundStyle(.secondary)
             }
         }
         .listStyle(.inset)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Menu {
-                    Button("Em branco…") {
+                    Button(L("Em branco…")) {
                         editing = Routine(
-                            name: "Nova rotina", schedule: .weekly(weekday: 1, hour: 10, minute: 0),
+                            name: L("Nova rotina"), schedule: .weekly(weekday: 1, hour: 10, minute: 0),
                             task: .cleanCaches(minAgeDays: 7))
                     }
                     Divider()
@@ -34,7 +36,7 @@ struct RoutinesView: View {
                         }
                     }
                 } label: {
-                    Label("Nova rotina", systemImage: "plus")
+                    Label(L("Nova rotina"), systemImage: "plus")
                 }
             }
         }
@@ -65,31 +67,32 @@ struct RoutineRow: View {
                 HStack(spacing: 6) {
                     Text(routine.name).font(.headline)
                     Badge(
-                        text: routine.apply ? "Executa a limpeza" : "Só avisa", color: routine.apply ? .green : .blue,
+                        text: routine.apply ? L("Executa a limpeza") : L("Só avisa"),
+                        color: routine.apply ? .green : .blue,
                         icon: routine.apply ? "sparkles" : "bell")
                 }
                 Text(routine.task.detail).font(.callout).foregroundStyle(.secondary)
                 HStack(spacing: 12) {
                     Label(routine.schedule.summary(), systemImage: "clock")
                     if routine.enabled {
-                        Label("Próxima: \(Fmt.dateTimeString(routine.nextRun()))", systemImage: "calendar")
+                        Label(L("Próxima: %@", Fmt.dateTimeString(routine.nextRun())), systemImage: "calendar")
                     }
-                    Label("Última: \(routine.lastRun.map(Fmt.ago) ?? "nunca")", systemImage: "checkmark.circle")
+                    Label(L("Última: %@", routine.lastRun.map(Fmt.ago) ?? "nunca"), systemImage: "checkmark.circle")
                 }.font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
             if running { ProgressView().controlSize(.small) }
-            Button("Rodar agora") { model.runNow(routine) }.disabled(running)
+            Button(L("Rodar agora")) { model.runNow(routine) }.disabled(running)
             Button {
                 edit()
             } label: {
                 Image(systemName: "pencil")
-            }.help("Editar")
+            }.help(L("Editar"))
             Button(role: .destructive) {
                 model.deleteRoutine(routine)
             } label: {
                 Image(systemName: "trash")
-            }.help("Excluir")
+            }.help(L("Excluir"))
         }
         .buttonStyle(.bordered).controlSize(.small)
         .padding(.vertical, 6)
@@ -107,11 +110,11 @@ struct RoutineEditor: View {
         var id: String { rawValue }
         var title: String {
             switch self {
-            case .caches: return "Limpar caches e logs seguros"
-            case .trash: return "Esvaziar a Lixeira"
-            case .downloads: return "Limpar Downloads antigos"
-            case .projects: return "Limpar projetos inativos"
-            case .lowSpace: return "Avisar quando faltar espaço"
+            case .caches: return L("Limpar caches e logs seguros")
+            case .trash: return L("Esvaziar a Lixeira")
+            case .downloads: return L("Limpar Downloads antigos")
+            case .projects: return L("Limpar projetos inativos")
+            case .lowSpace: return L("Avisar quando faltar espaço")
             }
         }
     }
@@ -120,7 +123,10 @@ struct RoutineEditor: View {
         case hours, daily, weekly, monthly
         var id: String { rawValue }
         var title: String {
-            ["hours": "A cada N horas", "daily": "Todo dia", "weekly": "Toda semana", "monthly": "Todo mês"][rawValue]!
+            [
+                "hours": L("A cada N horas"), "daily": L("Todo dia"), "weekly": L("Toda semana"),
+                "monthly": L("Todo mês"),
+            ][rawValue]!
         }
     }
 
@@ -138,16 +144,16 @@ struct RoutineEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Form {
-                TextField("Nome", text: $routine.name)
-                Picker("O que fazer", selection: $taskKind) { ForEach(TaskKind.allCases) { Text($0.title).tag($0) } }
+                TextField(L("Nome"), text: $routine.name)
+                Picker(L("O que fazer"), selection: $taskKind) { ForEach(TaskKind.allCases) { Text($0.title).tag($0) } }
                 switch taskKind {
-                case .caches: Stepper("Só itens parados há \(days)+ dias", value: $days, in: 1...365)
-                case .trash: Stepper("Só o que está na Lixeira há \(days)+ dias", value: $days, in: 0...365)
+                case .caches: Stepper(L("Só itens parados há %lld+ dias", days), value: $days, in: 1...365)
+                case .trash: Stepper(L("Só o que está na Lixeira há %lld+ dias", days), value: $days, in: 0...365)
                 case .downloads:
-                    Stepper("Só itens com \(days)+ dias", value: $days, in: 1...730)
-                    Toggle("Apenas instaladores (.dmg, .pkg, .iso)", isOn: $installersOnly)
+                    Stepper(L("Só itens com %lld+ dias", days), value: $days, in: 1...730)
+                    Toggle(L("Apenas instaladores (.dmg, .pkg, .iso)"), isOn: $installersOnly)
                 case .projects:
-                    Stepper("Só projetos sem alteração há \(days)+ dias", value: $days, in: 7...730)
+                    Stepper(L("Só projetos sem alteração há %lld+ dias", days), value: $days, in: 7...730)
                     VStack(alignment: .leading) {
                         ForEach(roots, id: \.self) { root in
                             HStack {
@@ -160,32 +166,36 @@ struct RoutineEditor: View {
                                 }.buttonStyle(.borderless)
                             }
                         }
-                        Button("Adicionar pasta de projetos…") { pickFolder() }
+                        Button(L("Adicionar pasta de projetos…")) { pickFolder() }
                     }
-                case .lowSpace: Stepper("Avisar abaixo de \(gb) GB livres", value: $gb, in: 1...500)
+                case .lowSpace: Stepper(L("Avisar abaixo de %lld GB livres", gb), value: $gb, in: 1...500)
                 }
                 Divider()
-                Picker("Quando", selection: $scheduleKind) { ForEach(ScheduleKind.allCases) { Text($0.title).tag($0) } }
+                Picker(L("Quando"), selection: $scheduleKind) {
+                    ForEach(ScheduleKind.allCases) { Text($0.title).tag($0) }
+                }
                 switch scheduleKind {
-                case .hours: Stepper("A cada \(hours) hora(s)", value: $hours, in: 1...168)
-                case .daily: DatePicker("Horário", selection: $time, displayedComponents: .hourAndMinute)
+                case .hours: Stepper(L("A cada %lld hora(s)", hours), value: $hours, in: 1...168)
+                case .daily: DatePicker(L("Horário"), selection: $time, displayedComponents: .hourAndMinute)
                 case .weekly:
-                    Picker("Dia", selection: $weekday) {
+                    Picker(L("Dia"), selection: $weekday) {
                         ForEach(1...7, id: \.self) { Text(Calendar.current.weekdaySymbols[$0 - 1].capitalized).tag($0) }
                     }
-                    DatePicker("Horário", selection: $time, displayedComponents: .hourAndMinute)
+                    DatePicker(L("Horário"), selection: $time, displayedComponents: .hourAndMinute)
                 case .monthly:
-                    Stepper("Dia \(monthDay) do mês", value: $monthDay, in: 1...28)
-                    DatePicker("Horário", selection: $time, displayedComponents: .hourAndMinute)
+                    Stepper(L("Dia %lld do mês", monthDay), value: $monthDay, in: 1...28)
+                    DatePicker(L("Horário"), selection: $time, displayedComponents: .hourAndMinute)
                 }
                 Divider()
-                Toggle("Executar a limpeza (desligado: só calcula e avisa)", isOn: $routine.apply)
-                Toggle("Notificar o resultado", isOn: $routine.notify)
+                Toggle(L("Executar a limpeza (desligado: só calcula e avisa)"), isOn: $routine.apply)
+                Toggle(L("Notificar o resultado"), isOn: $routine.notify)
                 if routine.apply, taskKind == .downloads || taskKind == .projects {
                     Text(
                         taskKind == .downloads
-                            ? "Downloads vão para a Lixeira, não são apagados de vez."
-                            : "Projetos inativos têm só os arquivos recriáveis removidos (node_modules, target, .venv…), nunca o código."
+                            ? L("Downloads vão para a Lixeira, não são apagados de vez.")
+                            : L(
+                                "Projetos inativos têm só os arquivos recriáveis removidos (node_modules, target, .venv…), nunca o código."
+                            )
                     )
                     .font(.caption).foregroundStyle(.secondary)
                 }
@@ -193,8 +203,8 @@ struct RoutineEditor: View {
             .formStyle(.grouped)
             HStack {
                 Spacer()
-                Button("Cancelar") { dismiss() }.keyboardShortcut(.cancelAction)
-                Button("Salvar") { save() }.keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent)
+                Button(L("Cancelar")) { dismiss() }.keyboardShortcut(.cancelAction)
+                Button(L("Salvar")) { save() }.keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent)
                     .disabled(
                         routine.name.trimmingCharacters(in: .whitespaces).isEmpty
                             || (taskKind == .projects && roots.isEmpty))

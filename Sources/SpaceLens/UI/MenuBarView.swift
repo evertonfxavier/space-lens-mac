@@ -10,6 +10,7 @@ struct MenuBarView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             header
+            if let update = model.visibleUpdate { updateRow(update) }
             if model.isScanning { scanning }
             freeable
             if !topItems.isEmpty { top }
@@ -19,6 +20,17 @@ struct MenuBarView: View {
         }
         .padding(16)
         .frame(width: 340)
+        .id(model.languageRevision)
+    }
+
+    private func updateRow(_ update: ReleaseInfo) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "arrow.down.circle.fill").foregroundStyle(.blue)
+            Text(L("Nova versão disponível: %@", update.version.description)).font(.callout.weight(.semibold))
+            Spacer()
+            Button(L("Baixar")) { model.openUpdate(download: true) }.controlSize(.small)
+        }
+        .padding(10).background(.blue.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
     }
 
     private var header: some View {
@@ -38,10 +50,10 @@ struct MenuBarView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(model.freeSpaceText).font(.system(size: 26, weight: .semibold, design: .rounded))
                     .foregroundStyle(model.isLowOnSpace ? .red : .primary)
-                Text(model.usage.map { "livres de \(Fmt.size($0.total))" } ?? "").font(.callout).foregroundStyle(
+                Text(model.usage.map { L("livres de %@", Fmt.size($0.total)) } ?? "").font(.callout).foregroundStyle(
                     .secondary)
                 if model.isLowOnSpace {
-                    Text("Pouco espaço: abaixo de \(model.settings.lowSpaceThresholdGB) GB").font(
+                    Text(L("Pouco espaço: abaixo de %lld GB", model.settings.lowSpaceThresholdGB)).font(
                         .caption.weight(.medium)
                     ).foregroundStyle(.red)
                 }
@@ -55,11 +67,11 @@ struct MenuBarView: View {
             ProgressView().controlSize(.small)
             switch model.phase {
             case .scanning(let items, let bytes, _):
-                Text("Analisando… \(items.formatted()) itens · \(Fmt.size(bytes))").font(.caption)
-            default: Text("Classificando…").font(.caption)
+                Text(L("Analisando… %@ itens · %@", items.formatted(), Fmt.size(bytes))).font(.caption)
+            default: Text(L("Classificando…")).font(.caption)
             }
             Spacer()
-            Button("Cancelar") { model.cancelScan() }.buttonStyle(.link).font(.caption)
+            Button(L("Cancelar")) { model.cancelScan() }.buttonStyle(.link).font(.caption)
         }
     }
 
@@ -72,7 +84,8 @@ struct MenuBarView: View {
                     Image(systemName: "checkmark.shield.fill").foregroundStyle(.green)
                     Text(
                         safeToFree > 0
-                            ? "\(Fmt.size(safeToFree)) para liberar com segurança" : "Nada seguro para limpar agora"
+                            ? L("%@ para liberar com segurança", Fmt.size(safeToFree))
+                            : L("Nada seguro para limpar agora")
                     )
                     .font(.callout.weight(.semibold))
                 }
@@ -80,15 +93,15 @@ struct MenuBarView: View {
                     Button {
                         Task { await model.quickClean() }
                     } label: {
-                        Label("Limpar \(Fmt.size(model.quickCleanSize))", systemImage: "sparkles").frame(
+                        Label(L("Limpar %@", Fmt.size(model.quickCleanSize)), systemImage: "sparkles").frame(
                             maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent).controlSize(.large).disabled(model.isBusy)
                 } else if model.analysis == nil, !model.isScanning {
-                    Text("Analise de novo para poder limpar daqui.").font(.caption).foregroundStyle(.secondary)
+                    Text(L("Analise de novo para poder limpar daqui.")).font(.caption).foregroundStyle(.secondary)
                 }
             } else if !model.isScanning {
-                Text("Ainda não analisei o disco. Analise para ver o que dá para apagar.").font(.callout)
+                Text(L("Ainda não analisei o disco. Analise para ver o que dá para apagar.")).font(.callout)
                     .foregroundStyle(.secondary)
             }
         }
@@ -119,7 +132,11 @@ struct MenuBarView: View {
     private var routines: some View {
         Group {
             if let (routine, date) = model.nextRoutine {
-                Label("\(routine.name) · \(Fmt.ago(date))", systemImage: "clock").font(.caption).foregroundStyle(
+                Label {
+                    Text(verbatim: "\(routine.name) · \(Fmt.ago(date))")
+                } icon: {
+                    Image(systemName: "clock")
+                }.font(.caption).foregroundStyle(
                     .secondary)
             }
         }
@@ -130,12 +147,12 @@ struct MenuBarView: View {
             Button {
                 openMain()
             } label: {
-                Label("Abrir", systemImage: "macwindow")
+                Label(L("Abrir"), systemImage: "macwindow")
             }
             Button {
                 model.startScan()
             } label: {
-                Label("Analisar", systemImage: "arrow.clockwise")
+                Label(L("Analisar"), systemImage: "arrow.clockwise")
             }
             .disabled(model.isScanning)
             Spacer()
@@ -143,12 +160,12 @@ struct MenuBarView: View {
                 openSettings()
             } label: {
                 Image(systemName: "gearshape")
-            }.help("Ajustes")
+            }.help(L("Ajustes"))
             Button {
                 quit()
             } label: {
                 Image(systemName: "power")
-            }.help("Sair do SpaceLens")
+            }.help(L("Sair do SpaceLens"))
         }
         .buttonStyle(.borderless)
     }

@@ -10,13 +10,13 @@ enum Pane: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .overview: return "Visão geral"
-        case .recommendations: return "Recomendações"
-        case .categories: return "Categorias"
-        case .explorer: return "Explorar"
-        case .duplicates: return "Duplicados"
-        case .routines: return "Rotinas"
-        case .history: return "Histórico"
+        case .overview: return L("Visão geral")
+        case .recommendations: return L("Recomendações")
+        case .categories: return L("Categorias")
+        case .explorer: return L("Explorar")
+        case .duplicates: return L("Duplicados")
+        case .routines: return L("Rotinas")
+        case .history: return L("Histórico")
         }
     }
 
@@ -37,6 +37,13 @@ enum ScanPhase: Equatable {
     case idle
     case scanning(items: Int, bytes: Int64, path: String)
     case analyzing
+}
+
+enum UpdateStatus: Equatable {
+    case idle
+    case checking
+    case upToDate
+    case failed(String)
 }
 
 enum DuplicateState {
@@ -75,6 +82,11 @@ final class AppModel: ObservableObject {
     @Published var focusedCategory: Category?
     @Published var explorerMap = false
     @Published var expandedRecs: Set<String> = []
+    /// Bumps when the interface language changes so every view builds its texts again.
+    @Published var languageRevision = 0
+    /// The newest GitHub release when it is newer than this build (even if its banner was dismissed).
+    @Published var availableUpdate: ReleaseInfo?
+    @Published var updateStatus: UpdateStatus = .idle
 
     // MARK: Services
     let home: String
@@ -88,14 +100,17 @@ final class AppModel: ObservableObject {
     private let historyStore: JSONStore<[RunRecord]>
     private let summaryStore: JSONStore<ScanSummary?>
     var analyzer: Analyzer?
+    private let updateChecker: UpdateChecker?
 
     private var cancelFlag = LockedFlag()
     private var timer: Timer?
 
     init(
         home: String = NSHomeDirectory(), storeDirectory: URL = JSONStore<Int>.directory(),
-        auth: AuthGate = LocalAuthGate(), commands: CommandRunning = ProcessCommandRunner(), startTimers: Bool = true
+        auth: AuthGate = LocalAuthGate(), commands: CommandRunning = ProcessCommandRunner(), startTimers: Bool = true,
+        languageOverride: AppLanguage? = nil, updateChecker: UpdateChecker? = AppModel.defaultUpdateChecker()
     ) {
+        self.updateChecker = updateChecker
         self.home = home
         self.guardrail = SafetyGuard(home: home)
         self.commands = commands
@@ -105,7 +120,11 @@ final class AppModel: ObservableObject {
         routinesStore = JSONStore(url: storeDirectory.appendingPathComponent("routines.json"))
         historyStore = JSONStore(url: storeDirectory.appendingPathComponent("history.json"))
         summaryStore = JSONStore(url: storeDirectory.appendingPathComponent("summary.json"))
-        settings = settingsStore.load(default: AppSettings())
+        var loaded = settingsStore.load(default: AppSettings())
+        // Only the screenshot harness passes an override; it must not touch the real preferences.
+        if let languageOverride { loaded.language = languageOverride }
+        settings = loaded
+        Localizer.shared.language = loaded.language
         let fresh = !FileManager.default.fileExists(atPath: storeDirectory.appendingPathComponent("routines.json").path)
         routines = routinesStore.load(default: fresh ? Routine.presets(home: home) : [])
         history = historyStore.load(default: [])
@@ -113,6 +132,15 @@ final class AppModel: ObservableObject {
         usage = DiskInfo.current()
         if fresh { routinesStore.save(routines) }
         if startTimers { startTicking() }
+    }
+
+    /// Compares against the version in Info.plist. A build without a parseable version (a bare `swiftc` run) never
+    /// checks, so it cannot claim to be outdated.
+    nonisolated static func defaultUpdateChecker() -> UpdateChecker? {
+        guard let text = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
+            let current = AppVersion(text)
+        else { return nil }
+        return UpdateChecker(current: current, fetcher: URLSessionFetcher(userAgent: "SpaceLens/\(current)"))
     }
 
     // MARK: - Derived
@@ -254,7 +282,7 @@ final class AppModel: ObservableObject {
             case .approved, .unavailable: return true
             case .cancelled: return false
             case .failed(let message):
-                report = CleaningReport(title: "Não foi possível confirmar", result: failureResult(message))
+                report = CleaningReport(title: L("Não foi possível confirmar"), result: failureResult(message))
                 return false
             }
         }
@@ -262,8 +290,8 @@ final class AppModel: ObservableObject {
         let alert = NSAlert()
         alert.messageText = reason
         alert.informativeText = details
-        alert.addButton(withTitle: "Limpar")
-        alert.addButton(withTitle: "Cancelar")
+        alert.addButton(withTitle: L("Limpar"))
+        alert.addButton(withTitle: L("Cancelar"))
         NSApp.activate(ignoringOtherApps: true)
         return alert.runModal() == .alertFirstButtonReturn
     }
@@ -278,18 +306,19 @@ final class AppModel: ObservableObject {
         let items = selectedItems(rec)
         guard !items.isEmpty, !isBusy else { return }
         let size = items.reduce(0) { $0 + $1.size }
-        let what = rec.sizeIsReference ? rec.title : "\(ByteFormat.string(size)) de “\(rec.title)”"
+        let what = rec.sizeIsReference ? rec.title : L("%@ de “%@”", ByteFormat.string(size), rec.title)
         let how =
             rec.isCommand
-            ? "Executa: \(rec.command?.display ?? "")"
+            ? L("Executa: %@", rec.command?.display ?? "")
             : ((rec.mode == .trash || settings.alwaysUseTrash) && !rec.needsAdmin
-                ? "Vai para a Lixeira." : "Apaga de vez.")
+                ? L("Vai para a Lixeira.") : L("Apaga de vez."))
         guard
             await confirm(
-                "Limpar \(what)?", details: [how, rec.consequence].filter { !$0.isEmpty }.joined(separator: "\n\n"),
+                L("Limpar %@?", what),
+                details: [how, rec.consequence].filter { !$0.isEmpty }.joined(separator: "\n\n"),
                 systemItems: rec.needsAdmin)
         else { return }
-        busyMessage = "Limpando “\(rec.title)”…"
+        busyMessage = L("Limpando “%@”…", rec.title)
         let result = await cleaner.perform(rec, selected: items, forceTrash: settings.alwaysUseTrash)
         busyMessage = nil
         applyCleaning(result, to: [rec])
@@ -305,12 +334,14 @@ final class AppModel: ObservableObject {
         let list = recs.map { "• \($0.title) — \(ByteFormat.string(selectedSize($0)))" }.joined(separator: "\n")
         guard
             await confirm(
-                "Liberar \(ByteFormat.string(size)) com segurança?",
+                L("Liberar %@ com segurança?", ByteFormat.string(size)),
                 details:
-                    "Vai limpar o que está marcado como seguro:\n\n\(list)\n\nNada seu é perdido: tudo isso é recriado pelo macOS e pelos apps."
+                    L(
+                        "Vai limpar o que está marcado como seguro:\n\n%@\n\nNada seu é perdido: tudo isso é recriado pelo macOS e pelos apps.",
+                        list)
             )
         else { return }
-        busyMessage = "Liberando espaço…"
+        busyMessage = L("Liberando espaço…")
         var total = CleanupResult()
         for rec in recs {
             let r = await cleaner.perform(
@@ -322,24 +353,24 @@ final class AppModel: ObservableObject {
             applyCleaning(r, to: [rec])
         }
         busyMessage = nil
-        report = CleaningReport(title: "Limpeza rápida", result: total)
-        record(manual: "Limpeza rápida", total)
+        report = CleaningReport(title: L("Limpeza rápida"), result: total)
+        record(manual: L("Limpeza rápida"), total)
     }
 
     func trashManually(_ nodes: [FileNode]) async {
         guard !nodes.isEmpty, !isBusy else { return }
         let items = nodes.map { CleanupItem(path: $0.path, size: $0.size, modified: $0.modified) }
         let size = items.reduce(0) { $0 + $1.size }
-        guard await confirm("Confirme para mover \(ByteFormat.string(size)) para a Lixeira.", details: nil) else {
+        guard await confirm(L("Confirme para mover %@ para a Lixeira.", ByteFormat.string(size)), details: nil) else {
             return
         }
-        busyMessage = "Movendo para a Lixeira…"
+        busyMessage = L("Movendo para a Lixeira…")
         let result = await cleaner.trashManually(items)
         busyMessage = nil
         usage = DiskInfo.current()
         analysisIsStale = analysisIsStale || result.removedCount > 0
-        report = CleaningReport(title: "Mover para a Lixeira", result: result)
-        record(manual: "Mover para a Lixeira", result)
+        report = CleaningReport(title: L("Mover para a Lixeira"), result: result)
+        record(manual: L("Mover para a Lixeira"), result)
     }
 
     private func applyCleaning(_ result: CleanupResult, to recs: [Recommendation]) {
@@ -399,9 +430,9 @@ final class AppModel: ObservableObject {
         let size = nodes.reduce(0) { $0 + $1.size }
         guard
             await confirm(
-                "Confirme para mover \(nodes.count) duplicado(s) (\(ByteFormat.string(size))) para a Lixeira.")
+                L("Confirme para mover %lld duplicado(s) (%@) para a Lixeira.", nodes.count, ByteFormat.string(size)))
         else { return }
-        busyMessage = "Movendo duplicados para a Lixeira…"
+        busyMessage = L("Movendo duplicados para a Lixeira…")
         let result = await cleaner.trashManually(nodes)
         busyMessage = nil
         usage = DiskInfo.current()
@@ -414,18 +445,19 @@ final class AppModel: ObservableObject {
             }.filter { $0.files.count > 1 })
         duplicateSelection.subtract(gone)
         analysisIsStale = analysisIsStale || result.removedCount > 0
-        report = CleaningReport(title: "Duplicados", result: result)
-        record(manual: "Duplicados", result)
+        report = CleaningReport(title: L("Duplicados"), result: result)
+        record(manual: L("Duplicados"), result)
     }
 
     // MARK: - History
 
     private func record(manual title: String, _ result: CleanupResult) {
         guard result.removedCount > 0 || !result.failures.isEmpty else { return }
-        var message = result.removedCount > 0 ? "\(result.removedCount) item(ns)." : "Nada removido."
-        if result.freed > 0 { message = "Liberou \(ByteFormat.string(result.freed)). " + message }
-        if result.trashed > 0 { message += " \(ByteFormat.string(result.trashed)) na Lixeira." }
-        if !result.failures.isEmpty { message += " \(result.failures.count) falha(s)." }
+        var message =
+            result.removedCount > 0 ? L("%lld item(ns).", result.removedCount) : L("Nada removido.")
+        if result.freed > 0 { message = L("Liberou %@.", ByteFormat.string(result.freed)) + " " + message }
+        if result.trashed > 0 { message += " " + L("%@ na Lixeira.", ByteFormat.string(result.trashed)) }
+        if !result.failures.isEmpty { message += " " + L("%lld falha(s).", result.failures.count) }
         addHistory(
             RunRecord(
                 routineID: nil, routineName: title, date: Date(), applied: true, freed: result.freed,
@@ -502,11 +534,48 @@ final class AppModel: ObservableObject {
         for routine in routines where routine.isDue(at: now) && !runningRoutines.contains(routine.id) {
             runNow(routine)
         }
+        if settings.checkForUpdates, updateStatus != .checking,
+            now.timeIntervalSince(settings.lastUpdateCheck ?? .distantPast) > 24 * 3600
+        {
+            Task { await checkForUpdates() }
+        }
         let hours = settings.autoScanHours
         if hours > 0, phase == .idle {
             let last = summary?.date ?? .distantPast
             if now.timeIntervalSince(last) > Double(hours) * 3600 { startScan() }
         }
+    }
+
+    // MARK: - Updates
+
+    /// The release to announce: newer than this build and not dismissed.
+    var visibleUpdate: ReleaseInfo? {
+        guard let update = availableUpdate, update.tag != settings.dismissedUpdate else { return nil }
+        return update
+    }
+
+    func checkForUpdates() async {
+        guard let updateChecker, updateStatus != .checking else { return }
+        updateStatus = .checking
+        let result = await updateChecker.check()
+        settings.lastUpdateCheck = Date()
+        switch result {
+        case .upToDate:
+            availableUpdate = nil
+            updateStatus = .upToDate
+        case .available(let release):
+            availableUpdate = release
+            updateStatus = .upToDate
+        case .failed(let message):
+            updateStatus = .failed(message)
+        }
+    }
+
+    func dismissUpdate() { settings.dismissedUpdate = availableUpdate?.tag }
+
+    func openUpdate(download: Bool) {
+        guard let update = availableUpdate else { return }
+        NSWorkspace.shared.open(download ? (update.downloadURL ?? update.pageURL) : update.pageURL)
     }
 
     func refreshAccess() { fullDiskAccess = FullDiskAccess.isGranted() }
@@ -516,9 +585,32 @@ final class AppModel: ObservableObject {
     private func settingsChanged(_ old: AppSettings) {
         settingsStore.save(settings)
         if old.scope != settings.scope { analysisIsStale = true }
+        if old.language != settings.language { applyLanguage() }
         if !old.notifications && settings.notifications {
             Task { await notifier.requestAuthorization() }
         }
+    }
+
+    /// Switches every text on screen. The catalog texts inside the current analysis are translated in place, because
+    /// a new analysis would bring back items that were already cleaned.
+    private func applyLanguage() {
+        Localizer.shared.language = settings.language
+        // The language list also decides how macOS words its own dialogs, but only at the next launch.
+        if settings.language == .system {
+            UserDefaults.standard.removeObject(forKey: "AppleLanguages")
+        } else {
+            UserDefaults.standard.set([settings.language.code], forKey: "AppleLanguages")
+        }
+        if let current = analysis { analysis = current.relocalized(home: home) }
+        if var current = summary {
+            let texts = Catalog.texts(home: home)
+            for index in current.top.indices {
+                if let text = texts[current.top[index].id] { current.top[index].title = text.title }
+            }
+            summary = current
+            summaryStore.save(current)
+        }
+        languageRevision += 1
     }
 
     var launchAtLogin: Bool {
@@ -527,7 +619,8 @@ final class AppModel: ObservableObject {
             do {
                 if newValue { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
             } catch {
-                report = CleaningReport(title: "Iniciar com o Mac", result: failureResult(error.localizedDescription))
+                report = CleaningReport(
+                    title: L("Iniciar com o Mac"), result: failureResult(error.localizedDescription))
             }
             objectWillChange.send()
         }

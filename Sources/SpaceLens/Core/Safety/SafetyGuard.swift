@@ -51,30 +51,30 @@ public struct SafetyGuard: Sendable {
 
     /// Whether `path` may be removed with `mode`.
     public func check(_ path: String, mode: RemovalMode, origin: Origin) -> Verdict {
-        guard path.hasPrefix("/") else { return .denied("Caminho inválido.") }
-        guard let canonical = Self.canonical(path) else { return .denied("Caminho inválido.") }
+        guard path.hasPrefix("/") else { return .denied(L("Caminho inválido.")) }
+        guard let canonical = Self.canonical(path) else { return .denied(L("Caminho inválido.")) }
         if protectedExact.contains(canonical) {
             return .denied(
-                "Pasta protegida: apagar “\((canonical as NSString).lastPathComponent)” inteira não é seguro.")
+                L("Pasta protegida: apagar “%@” inteira não é seguro.", (canonical as NSString).lastPathComponent))
         }
         for prefix in protectedInside where canonical == prefix || canonical.hasPrefix(prefix + "/") {
-            return .denied("Área protegida do sistema ou dos seus dados pessoais.")
+            return .denied(L("Área protegida do sistema ou dos seus dados pessoais."))
         }
         if canonical.split(separator: "/").contains(where: { $0.hasSuffix(".photoslibrary") }) {
-            return .denied("Biblioteca do Fotos: use o app Fotos para liberar espaço.")
+            return .denied(L("Biblioteca do Fotos: use o app Fotos para liberar espaço."))
         }
         if origin == .manual && mode != .trash {
-            return .denied("Itens escolhidos por você só podem ir para a Lixeira.")
+            return .denied(L("Itens escolhidos por você só podem ir para a Lixeira."))
         }
         if canonical.hasPrefix(home + "/") { return .allowed }
         if isInsideAdminArea(canonical) {
-            return mode == .delete ? .allowed : .denied("Itens do sistema não vão para a Lixeira.")
+            return mode == .delete ? .allowed : .denied(L("Itens do sistema não vão para a Lixeira."))
         }
         let parts = canonical.split(separator: "/")
         if parts.count == 2, parts[0] == "Applications", parts[1].hasSuffix(".app"), mode == .trash {
             return .allowed
         }
-        return .denied("Fora da sua pasta pessoal.")
+        return .denied(L("Fora da sua pasta pessoal."))
     }
 
     /// Only the system caches and logs on the allowlist may ever be removed with an administrator password.

@@ -9,6 +9,19 @@
 App nativo para macOS (SwiftUI + AppKit) que mostra **o que consome seu armazenamento**, diz **o que pode ou não ser apagado**, separa tudo **por categoria**, roda **rotinas de limpeza** e vive na **barra de menus**.
 Um único app com duas faces: a janela principal e o ícone na barra de menus (espaço livre ao lado do ícone, vermelho quando está acabando).
 
+![Visão geral](docs/screenshots/pt-BR/overview.png)
+
+<p>
+  <img src="docs/screenshots/pt-BR/recommendations.png" width="49%" alt="Recomendações">
+  <img src="docs/screenshots/pt-BR/explorer-map.png" width="49%" alt="Explorar em mapa">
+</p>
+<p>
+  <img src="docs/screenshots/pt-BR/routines.png" width="49%" alt="Rotinas">
+  <img src="docs/screenshots/pt-BR/menubar.png" width="49%" alt="Barra de menus">
+</p>
+
+(As capturas usam dados de demonstração.)
+
 ## Usar
 
 ```bash
@@ -36,6 +49,12 @@ Se o SDK mais novo não compilar `@State` (falta o plugin SwiftUIMacros nas CLT)
 
 Reconhece: caches de apps e do sistema, Xcode (DerivedData, símbolos de dispositivos, Archives, simuladores), npm/yarn/pnpm, Cargo, Gradle, Maven, NuGet, Go, Conda, versões de nvm/pyenv/rustup, `node_modules`/`target`/`Pods`/`.venv`/`bin`+`obj` etc. **só quando há um arquivo de projeto ao lado**, Docker, instantâneos locais do Time Machine, Lixeira, instaladores antigos em Downloads, backups de iPhone, anexos do Mensagens, arquivos grandes parados há 6+ meses.
 
+## Idioma, barra de menus e atualizações
+
+- **Idioma:** português, inglês ou espanhol, ou *Automático* para seguir o idioma do macOS. Muda o app inteiro na hora (Ajustes › Idioma).
+- **Barra de menus:** dá para desligar o ícone e o painel da barra de menus (Ajustes › Barra de menus). Sem eles o SpaceLens fica no Dock.
+- **Atualizações:** o SpaceLens avisa dentro do app quando existe uma [release](https://github.com/evertonfxavier/space-lens-mac/releases) mais nova: um aviso na janela e uma linha no painel da barra de menus. Ele nunca instala nada sozinho; **Baixar** abre o instalador no navegador. A verificação pode ser desligada (Ajustes › Atualizações).
+
 ## Senha e digital
 
 - **Antes de limpar** (ajuste, ligado por padrão): Touch ID, Apple Watch ou senha do Mac, pela `LocalAuthentication`. Desligado, aparece um alerta dizendo o que será removido.
@@ -46,7 +65,7 @@ Reconhece: caches de apps e do sistema, Xcode (DerivedData, símbolos de disposi
 
 - `SafetyGuard` é a última barreira antes de apagar: canonicaliza o caminho (`..`, symlinks nos pais), recusa raiz, sistema, `~`, `~/Library`, Documentos/Mesa/Downloads inteiros, `.ssh`, chaves, iCloud/nuvem, Mail e bibliotecas do Fotos. Itens escolhidos por você só vão para a **Lixeira**.
 - Só `/Library/Caches`, `/Library/Logs`, `/Library/Updates` e `/private/var/log` podem ser apagados como administrador.
-- Nada sai da sua máquina; o app não usa rede.
+- Nada sobre seus arquivos sai da sua máquina. A única requisição de rede é a verificação opcional de atualização: um `GET` anônimo para `api.github.com/repos/evertonfxavier/space-lens-mac/releases/latest` uma vez por dia, que você pode desligar nos Ajustes. Não há telemetria.
 - Itens "Revise antes" começam **desmarcados** e vão para a Lixeira. Projetos mexidos nos últimos 30 dias começam desmarcados.
 
 ## Permissões do macOS

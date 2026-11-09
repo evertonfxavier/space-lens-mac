@@ -6,8 +6,10 @@ struct ExplorerView: View {
     @State private var confirmTrash: FileNode?
 
     enum Mode: String, CaseIterable {
-        case list = "Lista"
-        case map = "Mapa"
+        case list
+        case map
+
+        var title: String { self == .list ? L("Lista") : L("Mapa") }
     }
 
     private var roots: [FileNode] { model.scan?.roots ?? [] }
@@ -16,7 +18,8 @@ struct ExplorerView: View {
     private var top: FileNode? {
         if roots.count == 1 { return roots[0] }
         guard !roots.isEmpty else { return nil }
-        let virtual = FileNode(name: "Este Mac", path: "/", isDirectory: true, size: roots.reduce(0) { $0 + $1.size })
+        let virtual = FileNode(
+            name: L("Este Mac"), path: "/", isDirectory: true, size: roots.reduce(0) { $0 + $1.size })
         virtual.children = roots.sorted { $0.size > $1.size }
         return virtual
     }
@@ -46,21 +49,21 @@ struct ExplorerView: View {
                     onTrash: { confirmTrash = $0 })
             }
             .confirmationDialog(
-                "Mover “\(confirmTrash?.name ?? "")” para a Lixeira?",
+                L("Mover “%@” para a Lixeira?", confirmTrash?.name ?? ""),
                 isPresented: Binding(get: { confirmTrash != nil }, set: { if !$0 { confirmTrash = nil } }),
                 titleVisibility: .visible, presenting: confirmTrash
             ) { target in
-                Button("Mover \(Fmt.size(target.size)) para a Lixeira", role: .destructive) {
+                Button(L("Mover %@ para a Lixeira", Fmt.size(target.size)), role: .destructive) {
                     Task {
                         await model.trashManually([target])
                         selectedPath = nil
                     }
                 }
             } message: { _ in
-                Text("Você pode recuperar pela Lixeira. O espaço só é liberado quando a Lixeira for esvaziada.")
+                Text(L("Você pode recuperar pela Lixeira. O espaço só é liberado quando a Lixeira for esvaziada."))
             }
         } else {
-            EmptyAnalysis(text: "Analise o disco para explorar pastas e arquivos por tamanho.")
+            EmptyAnalysis(text: L("Analise o disco para explorar pastas e arquivos por tamanho."))
         }
     }
 
@@ -78,15 +81,15 @@ struct ExplorerView: View {
                 Image(systemName: "chevron.left")
             }
             .disabled(current === top || current.parent == nil && current.path == top.path)
-            .help("Subir um nível")
+            .help(L("Subir um nível"))
             breadcrumb(current: current, top: top)
             Spacer()
             Picker(
-                "Modo",
+                L("Modo"),
                 selection: Binding(
                     get: { model.explorerMap ? Mode.map : Mode.list }, set: { model.explorerMap = $0 == .map })
             ) {
-                ForEach(Mode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                ForEach(Mode.allCases, id: \.self) { Text($0.title).tag($0) }
             }
             .pickerStyle(.segmented).frame(width: 130).labelsHidden()
         }
@@ -108,7 +111,7 @@ struct ExplorerView: View {
         return ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 4) {
                 if roots.count != 1 {
-                    Button("Este Mac") {
+                    Button(L("Este Mac")) {
                         model.explorerPath = nil
                         selectedPath = nil
                     }.buttonStyle(.link)
@@ -143,8 +146,9 @@ private struct ListPane: View {
             if current.residual > 0 {
                 HStack(spacing: 10) {
                     Image(systemName: "ellipsis.circle").foregroundStyle(.secondary).frame(width: 22)
-                    Text("Itens menores que 1 MB (\(current.fileCount.formatted()) arquivos no total)").foregroundStyle(
-                        .secondary)
+                    Text(L("Itens menores que 1 MB (%@ arquivos no total)", current.fileCount.formatted()))
+                        .foregroundStyle(
+                            .secondary)
                     Spacer()
                     Text(Fmt.size(current.residual)).monospacedDigit().foregroundStyle(.secondary).frame(
                         width: 76, alignment: .trailing)
@@ -176,7 +180,7 @@ private struct ExplorerRow: View {
                 } label: {
                     Image(systemName: "chevron.right.circle")
                 }
-                .buttonStyle(.borderless).help("Abrir pasta")
+                .buttonStyle(.borderless).help(L("Abrir pasta"))
             } else {
                 Color.clear.frame(width: 18)
             }
@@ -184,9 +188,9 @@ private struct ExplorerRow: View {
         .contentShape(Rectangle())
         .onTapGesture(count: 2) { open(node) }
         .contextMenu {
-            Button("Mostrar no Finder") { revealInFinder(node.path) }
-            Button("Copiar caminho") { copyToPasteboard(node.path) }
-            if node.isDirectory { Button("Abrir aqui") { open(node) } }
+            Button(L("Mostrar no Finder")) { revealInFinder(node.path) }
+            Button(L("Copiar caminho")) { copyToPasteboard(node.path) }
+            if node.isDirectory { Button(L("Abrir aqui")) { open(node) } }
         }
     }
 }
@@ -207,8 +211,9 @@ private struct Inspector: View {
                     SafetyBadge(safety: cls.safety)
                     Badge(text: cls.category.title, color: cls.category.color, icon: cls.category.icon)
                 }
-                Text(node.path).font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(1).truncationMode(
-                    .middle)
+                Text(Fmt.shortPath(node.path, home: model.home)).font(.caption.monospaced()).foregroundStyle(.secondary)
+                    .lineLimit(1).truncationMode(
+                        .middle)
                 Text(cls.explanation ?? NodeClass.unknown.explanation!).font(.callout)
                     .fixedSize(horizontal: false, vertical: true)
                 if let consequence = cls.consequence {
@@ -218,17 +223,17 @@ private struct Inspector: View {
             Spacer(minLength: 16)
             VStack(alignment: .trailing, spacing: 6) {
                 Text(Fmt.size(node.size)).font(.title3.weight(.semibold)).monospacedDigit()
-                Text("\(node.fileCount.formatted()) arquivos · alterado \(Fmt.ago(node.modified))")
+                Text(L("%@ arquivos · alterado %@", node.fileCount.formatted(), Fmt.ago(node.modified)))
                     .font(.caption).foregroundStyle(.secondary)
                 HStack {
-                    Button("Mostrar no Finder") { revealInFinder(node.path) }
+                    Button(L("Mostrar no Finder")) { revealInFinder(node.path) }
                     Button(role: .destructive) {
                         onTrash(node)
                     } label: {
-                        Label("Lixeira", systemImage: "trash")
+                        Label(L("Lixeira"), systemImage: "trash")
                     }
                     .disabled(!isSelection || !verdict.isAllowed || model.isBusy)
-                    .help(verdict.isAllowed ? "Mover para a Lixeira" : deniedText(verdict))
+                    .help(verdict.isAllowed ? L("Mover para a Lixeira") : deniedText(verdict))
                 }
             }
         }
@@ -294,7 +299,7 @@ struct TreemapView: View {
                             with: .color(cls.safety == .safe ? .white : Color(red: 0.55, green: 0.0, blue: 0.0)))
                     }
                     if rect.width > 64, rect.height > 34 {
-                        let name = cell.node?.name ?? "Itens menores"
+                        let name = cell.node?.name ?? L("Itens menores")
                         let size = Fmt.size(cell.node?.size ?? 0)
                         var text = context.resolve(
                             Text(name).font(.system(size: 11, weight: .semibold)).foregroundColor(.white))
@@ -324,7 +329,7 @@ struct TreemapView: View {
             .overlay(alignment: .bottomLeading) {
                 if let hovered, let cell = cells.first(where: { $0.id == hovered }) {
                     Text(
-                        "\(cell.node?.name ?? "Itens menores") · \(Fmt.size(cell.node?.size ?? max(0, node.size - node.children.prefix(150).reduce(0) { $0 + $1.size })))"
+                        "\(cell.node?.name ?? L("Itens menores")) · \(Fmt.size(cell.node?.size ?? max(0, node.size - node.children.prefix(150).reduce(0) { $0 + $1.size })))"
                     )
                     .font(.caption.weight(.medium)).padding(.horizontal, 8).padding(.vertical, 4)
                     .background(.regularMaterial, in: Capsule()).padding(8)
@@ -332,7 +337,7 @@ struct TreemapView: View {
             }
         }
         .padding(8)
-        .accessibilityLabel("Mapa de tamanho de \(node.name)")
+        .accessibilityLabel(L("Mapa de tamanho de %@", node.name))
     }
 
     private func hit(_ point: CGPoint, _ cells: [Entry]) -> Entry? { cells.first { $0.rect.contains(point) } }

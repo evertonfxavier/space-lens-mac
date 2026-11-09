@@ -30,13 +30,15 @@ public enum Schedule: Codable, Equatable, Sendable {
 
     public func summary(calendar: Calendar = .current) -> String {
         func time(_ h: Int, _ m: Int) -> String { String(format: "%02d:%02d", h, m) }
+        var localized = calendar
+        localized.locale = Localizer.shared.locale
         switch self {
-        case .everyHours(let n): return n == 1 ? "A cada hora" : "A cada \(n) horas"
-        case .daily(let h, let m): return "Todo dia às \(time(h, m))"
+        case .everyHours(let n): return n == 1 ? L("A cada hora") : L("A cada %lld horas", n)
+        case .daily(let h, let m): return L("Todo dia às %@", time(h, m))
         case .weekly(let wd, let h, let m):
-            let name = calendar.weekdaySymbols[max(0, min(6, wd - 1))]
-            return "Toda \(name) às \(time(h, m))"
-        case .monthly(let d, let h, let m): return "Todo dia \(min(28, max(1, d))) às \(time(h, m))"
+            let name = localized.weekdaySymbols[max(0, min(6, wd - 1))]
+            return L("Toda %@ às %@", name, time(h, m))
+        case .monthly(let d, let h, let m): return L("Todo dia %lld às %@", min(28, max(1, d)), time(h, m))
         }
     }
 }
@@ -52,25 +54,28 @@ public enum RoutineTask: Codable, Equatable, Sendable {
 
     public var title: String {
         switch self {
-        case .cleanCaches: return "Limpar caches e logs seguros"
-        case .emptyTrash: return "Esvaziar a Lixeira"
-        case .cleanDownloads: return "Limpar Downloads antigos"
-        case .cleanProjectArtifacts: return "Limpar projetos inativos"
-        case .lowSpaceAlert: return "Avisar quando faltar espaço"
+        case .cleanCaches: return L("Limpar caches e logs seguros")
+        case .emptyTrash: return L("Esvaziar a Lixeira")
+        case .cleanDownloads: return L("Limpar Downloads antigos")
+        case .cleanProjectArtifacts: return L("Limpar projetos inativos")
+        case .lowSpaceAlert: return L("Avisar quando faltar espaço")
         }
     }
 
     public var detail: String {
         switch self {
-        case .cleanCaches(let d): return "Remove caches e logs que o macOS e os apps recriam, parados há \(d)+ dias."
-        case .emptyTrash(let d): return "Apaga de vez o que está na Lixeira há mais de \(d) dias."
+        case .cleanCaches(let d):
+            return L("Remove caches e logs que o macOS e os apps recriam, parados há %lld+ dias.", d)
+        case .emptyTrash(let d): return L("Apaga de vez o que está na Lixeira há mais de %lld dias.", d)
         case .cleanDownloads(let d, let only):
             return only
-                ? "Move para a Lixeira instaladores (.dmg, .pkg, .iso) com mais de \(d) dias."
-                : "Move para a Lixeira tudo em Downloads com mais de \(d) dias."
+                ? L("Move para a Lixeira instaladores (.dmg, .pkg, .iso) com mais de %lld dias.", d)
+                : L("Move para a Lixeira tudo em Downloads com mais de %lld dias.", d)
         case .cleanProjectArtifacts(_, let d):
-            return "Remove node_modules, target, .venv e similares de projetos sem alteração há \(d)+ dias. Recriáveis."
-        case .lowSpaceAlert(let gb): return "Notifica quando o espaço livre cair abaixo de \(gb) GB."
+            return L(
+                "Remove node_modules, target, .venv e similares de projetos sem alteração há %lld+ dias. Recriáveis.", d
+            )
+        case .lowSpaceAlert(let gb): return L("Notifica quando o espaço livre cair abaixo de %lld GB.", gb)
         }
     }
 }
@@ -114,16 +119,16 @@ public struct Routine: Codable, Identifiable, Equatable, Sendable {
     public static func presets(home: String, now: Date = Date()) -> [Routine] {
         [
             Routine(
-                name: "Caches e logs toda semana", schedule: .weekly(weekday: 1, hour: 10, minute: 0),
+                name: L("Caches e logs toda semana"), schedule: .weekly(weekday: 1, hour: 10, minute: 0),
                 task: .cleanCaches(minAgeDays: 7), apply: true, createdAt: now),
             Routine(
-                name: "Esvaziar Lixeira (30 dias)", schedule: .daily(hour: 12, minute: 0),
+                name: L("Esvaziar Lixeira (30 dias)"), schedule: .daily(hour: 12, minute: 0),
                 task: .emptyTrash(olderThanDays: 30), apply: false, createdAt: now),
             Routine(
-                name: "Instaladores antigos", schedule: .weekly(weekday: 2, hour: 9, minute: 0),
+                name: L("Instaladores antigos"), schedule: .weekly(weekday: 2, hour: 9, minute: 0),
                 task: .cleanDownloads(olderThanDays: 30, installersOnly: true), apply: false, createdAt: now),
             Routine(
-                name: "Pouco espaço livre", schedule: .everyHours(6), task: .lowSpaceAlert(thresholdGB: 20),
+                name: L("Pouco espaço livre"), schedule: .everyHours(6), task: .lowSpaceAlert(thresholdGB: 20),
                 apply: false, createdAt: now),
         ]
     }

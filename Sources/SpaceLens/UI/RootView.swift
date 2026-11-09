@@ -16,6 +16,7 @@ struct RootView: View {
             .safeAreaInset(edge: .bottom) { SidebarFooter() }
         } detail: {
             VStack(spacing: 0) {
+                if let update = model.visibleUpdate { UpdateBanner(update: update) }
                 if !model.fullDiskAccess { FullDiskAccessBanner() }
                 if model.analysisIsStale && !model.isScanning { StaleBanner() }
                 if model.isScanning { ScanProgressBar() }
@@ -28,6 +29,7 @@ struct RootView: View {
         .sheet(item: $model.report) { ReportSheet(report: $0) }
         .overlay { if let message = model.busyMessage { BusyOverlay(message: message) } }
         .frame(minWidth: 940, minHeight: 600)
+        .id(model.languageRevision)
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             model.refreshAccess()
         }
@@ -52,7 +54,7 @@ struct RootView: View {
             return size > 0 ? Text(Fmt.size(size)) : nil
         case .routines:
             let running = model.runningRoutines.count
-            return running > 0 ? Text("\(running) rodando") : nil
+            return running > 0 ? Text(L("%lld rodando", running)) : nil
         default: return nil
         }
     }
@@ -65,7 +67,7 @@ struct SidebarFooter: View {
         if let usage = model.usage {
             VStack(alignment: .leading, spacing: 6) {
                 SizeBar(fraction: usage.usedFraction, color: model.isLowOnSpace ? .red : .accentColor)
-                Text("\(Fmt.size(usage.availableImportant)) livres de \(Fmt.size(usage.total))")
+                Text(L("%@ livres de %@", Fmt.size(usage.availableImportant), Fmt.size(usage.total)))
                     .font(.caption).foregroundStyle(model.isLowOnSpace ? .red : .secondary)
             }
             .padding(.horizontal, 16).padding(.vertical, 12)
@@ -84,16 +86,16 @@ struct ScanToolbar: ToolbarContent {
                 Button(role: .cancel) {
                     model.cancelScan()
                 } label: {
-                    Label("Cancelar", systemImage: "xmark.circle")
+                    Label(L("Cancelar"), systemImage: "xmark.circle")
                 }
             } else {
                 Button {
                     model.startScan()
                 } label: {
-                    Label(model.analysis == nil ? "Analisar" : "Analisar de novo", systemImage: "arrow.clockwise")
+                    Label(model.analysis == nil ? L("Analisar") : L("Analisar de novo"), systemImage: "arrow.clockwise")
                 }
                 .keyboardShortcut("r", modifiers: .command)
-                .help("Analisar o disco (⌘R)")
+                .help(L("Analisar o disco (⌘R)"))
             }
         }
     }
@@ -108,10 +110,11 @@ struct ScanProgressBar: View {
             VStack(alignment: .leading, spacing: 2) {
                 switch model.phase {
                 case .scanning(let items, let bytes, let path):
-                    Text("Analisando… \(items.formatted()) itens · \(Fmt.size(bytes))").font(.callout.weight(.medium))
+                    Text(L("Analisando… %@ itens · %@", items.formatted(), Fmt.size(bytes))).font(
+                        .callout.weight(.medium))
                     Text(path).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
                 case .analyzing:
-                    Text("Classificando o que pode ser apagado…").font(.callout.weight(.medium))
+                    Text(L("Classificando o que pode ser apagado…")).font(.callout.weight(.medium))
                 case .idle: EmptyView()
                 }
             }
@@ -122,19 +125,48 @@ struct ScanProgressBar: View {
     }
 }
 
+/// A newer GitHub release exists. SpaceLens never replaces itself: the download opens in the browser.
+struct UpdateBanner: View {
+    @EnvironmentObject var model: AppModel
+    var update: ReleaseInfo
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "arrow.down.circle.fill").font(.title3).foregroundStyle(.blue)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(L("Nova versão disponível: %@", update.version.description)).font(.callout.weight(.semibold))
+                Text(L("Você está na versão %@. Baixe o instalador no GitHub.", UpdateBanner.currentVersion))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button(L("Ver novidades")) { model.openUpdate(download: false) }
+            Button(L("Baixar")) { model.openUpdate(download: true) }.buttonStyle(.borderedProminent)
+            Button(L("Agora não")) { model.dismissUpdate() }.buttonStyle(.borderless)
+        }
+        .padding(.horizontal, 20).padding(.vertical, 10)
+        .background(.blue.opacity(0.10))
+    }
+
+    static var currentVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
+    }
+}
+
 struct FullDiskAccessBanner: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: "lock.shield").font(.title3).foregroundStyle(.orange)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Acesso Total ao Disco desligado").font(.callout.weight(.semibold))
+                Text(L("Acesso Total ao Disco desligado")).font(.callout.weight(.semibold))
                 Text(
-                    "Sem ele o macOS esconde Mail, Mensagens, Safari, Lixeira e outras áreas. O tamanho delas não entra na análise."
+                    L(
+                        "Sem ele o macOS esconde Mail, Mensagens, Safari, Lixeira e outras áreas. O tamanho delas não entra na análise."
+                    )
                 )
                 .font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
-            Button("Abrir Ajustes do Sistema") { NSWorkspace.shared.open(FullDiskAccess.settingsURL) }
+            Button(L("Abrir Ajustes do Sistema")) { NSWorkspace.shared.open(FullDiskAccess.settingsURL) }
         }
         .padding(.horizontal, 20).padding(.vertical, 10)
         .background(.orange.opacity(0.12))
@@ -147,10 +179,10 @@ struct StaleBanner: View {
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: "arrow.triangle.2.circlepath").foregroundStyle(.secondary)
-            Text("Algo mudou desde a última análise. Analise de novo para atualizar os números e o Explorar.")
+            Text(L("Algo mudou desde a última análise. Analise de novo para atualizar os números e o Explorar."))
                 .font(.callout)
             Spacer()
-            Button("Analisar de novo") { model.startScan() }
+            Button(L("Analisar de novo")) { model.startScan() }
         }
         .padding(.horizontal, 20).padding(.vertical, 8)
         .background(.quaternary.opacity(0.5))
@@ -189,17 +221,19 @@ struct ReportSheet: View {
             }
             if r.trashed > 0 {
                 Label(
-                    "\(Fmt.size(r.trashed)) foram para a Lixeira e só liberam espaço quando você esvaziá-la (recomendação “Esvaziar Lixeira”, depois de analisar de novo).",
+                    L(
+                        "%@ foram para a Lixeira e só liberam espaço quando você esvaziá-la (recomendação “Esvaziar Lixeira”, depois de analisar de novo).",
+                        Fmt.size(r.trashed)),
                     systemImage: "trash"
                 )
                 .font(.callout).foregroundStyle(.secondary)
             }
             if r.cancelled {
-                Label("Você cancelou a autorização. Nada de sistema foi apagado.", systemImage: "hand.raised")
+                Label(L("Você cancelou a autorização. Nada de sistema foi apagado."), systemImage: "hand.raised")
                     .font(.callout).foregroundStyle(.secondary)
             }
             if !r.failures.isEmpty {
-                Text("Não foi possível (\(r.failures.count))").font(.subheadline.weight(.semibold))
+                Text(L("Não foi possível (%lld)", r.failures.count)).font(.subheadline.weight(.semibold))
                 ScrollView {
                     VStack(alignment: .leading, spacing: 6) {
                         ForEach(Array(r.failures.prefix(12).enumerated()), id: \.offset) { _, failure in
@@ -212,13 +246,13 @@ struct ReportSheet: View {
                         }
                     }.frame(maxWidth: .infinity, alignment: .leading)
                 }.frame(maxHeight: 140)
-                if r.failures.contains(where: { $0.reason.contains("Acesso Total ao Disco") }) {
-                    Button("Abrir Ajustes do Sistema") { NSWorkspace.shared.open(FullDiskAccess.settingsURL) }
+                if r.failures.contains(where: { $0.reason.contains(L("Acesso Total ao Disco")) }) {
+                    Button(L("Abrir Ajustes do Sistema")) { NSWorkspace.shared.open(FullDiskAccess.settingsURL) }
                 }
             }
             HStack {
                 Spacer()
-                Button("OK") { dismiss() }.keyboardShortcut(.defaultAction)
+                Button(L("OK")) { dismiss() }.keyboardShortcut(.defaultAction)
             }
         }
         .padding(24).frame(width: 460)
@@ -233,9 +267,9 @@ struct ReportSheet: View {
     private var color: Color { ok ? (report.result.failures.isEmpty ? .green : .orange) : .red }
     private var headline: String {
         let r = report.result
-        if r.freed > 0 { return "Liberou \(Fmt.size(r.freed)) em \(r.removedCount) item(ns)." }
-        if r.trashed > 0 { return "Moveu \(r.removedCount) item(ns) para a Lixeira." }
-        if r.removedCount > 0 { return "\(r.removedCount) item(ns) removido(s)." }
-        return "Nada foi removido."
+        if r.freed > 0 { return L("Liberou %@ em %lld item(ns).", Fmt.size(r.freed), r.removedCount) }
+        if r.trashed > 0 { return L("Moveu %lld item(ns) para a Lixeira.", r.removedCount) }
+        if r.removedCount > 0 { return L("%lld item(ns) removido(s).", r.removedCount) }
+        return L("Nada foi removido.")
     }
 }

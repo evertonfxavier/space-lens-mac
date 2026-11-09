@@ -3,6 +3,7 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleDevelopmentRegion</key><string>pt-BR</string>
+    <key>CFBundleLocalizations</key><array><string>pt-BR</string><string>en</string><string>es</string></array>
     <key>CFBundleExecutable</key><string>SpaceLens</string>
     <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>CFBundleIdentifier</key><string>com.everton.SpaceLens</string>

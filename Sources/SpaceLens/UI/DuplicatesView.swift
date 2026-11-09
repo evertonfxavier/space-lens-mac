@@ -5,29 +5,31 @@ struct DuplicatesView: View {
 
     var body: some View {
         if model.analysis == nil {
-            EmptyAnalysis(text: "Analise o disco para procurar arquivos duplicados.")
+            EmptyAnalysis(text: L("Analise o disco para procurar arquivos duplicados."))
         } else {
             switch model.duplicates {
             case .idle:
                 ContentUnavailableView {
-                    Label("Arquivos duplicados", systemImage: "doc.on.doc")
+                    Label(L("Arquivos duplicados"), systemImage: "doc.on.doc")
                 } description: {
                     Text(
-                        "Compara os arquivos de 1 MB ou mais da análise pelo conteúdo (não só pelo nome). Cópias idênticas ocupam espaço em dobro."
+                        L(
+                            "Compara os arquivos de 1 MB ou mais da análise pelo conteúdo (não só pelo nome). Cópias idênticas ocupam espaço em dobro."
+                        )
                     )
                 } actions: {
-                    Button("Procurar duplicados") { model.findDuplicates() }.buttonStyle(.borderedProminent)
+                    Button(L("Procurar duplicados")) { model.findDuplicates() }.buttonStyle(.borderedProminent)
                 }
             case .running(let done, let total):
                 VStack(spacing: 14) {
                     ProgressView(value: Double(done), total: Double(max(1, total))).frame(width: 320)
-                    Text("Comparando conteúdo… \(done) de \(total)").foregroundStyle(.secondary)
+                    Text(L("Comparando conteúdo… %lld de %lld", done, total)).foregroundStyle(.secondary)
                 }.frame(maxWidth: .infinity, maxHeight: .infinity)
             case .done(let groups):
                 if groups.isEmpty {
                     ContentUnavailableView(
-                        "Nenhum duplicado", systemImage: "checkmark.seal",
-                        description: Text("Não encontrei arquivos idênticos de 1 MB ou mais."))
+                        L("Nenhum duplicado"), systemImage: "checkmark.seal",
+                        description: Text(L("Não encontrei arquivos idênticos de 1 MB ou mais.")))
                 } else {
                     results(groups)
                 }
@@ -42,7 +44,9 @@ struct DuplicatesView: View {
         }
         return List {
             Text(
-                "Em cada grupo a cópia mais antiga fica de fora (é provavelmente o original). Cópias APFS clonadas podem dividir o mesmo espaço, então o ganho real pode ser menor que o mostrado. Tudo vai para a Lixeira."
+                L(
+                    "Em cada grupo a cópia mais antiga fica de fora (é provavelmente o original). Cópias APFS clonadas podem dividir o mesmo espaço, então o ganho real pode ser menor que o mostrado. Tudo vai para a Lixeira."
+                )
             )
             .font(.callout).foregroundStyle(.secondary).listRowSeparator(.hidden)
             ForEach(groups) { group in
@@ -70,7 +74,7 @@ struct DuplicatesView: View {
                                 .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.head)
                             }
                             Spacer()
-                            if index == 0 { Badge(text: "Original provável", color: .green) }
+                            if index == 0 { Badge(text: L("Original provável"), color: .green) }
                             Text(Fmt.ago(file.modified)).font(.caption).foregroundStyle(.secondary)
                             Button {
                                 revealInFinder(file.path)
@@ -82,9 +86,9 @@ struct DuplicatesView: View {
                     }
                 } header: {
                     HStack {
-                        Text("\(group.files.count) cópias de \(Fmt.size(group.size))").font(.headline)
+                        Text(L("%lld cópias de %@", group.files.count, Fmt.size(group.size))).font(.headline)
                         Spacer()
-                        Text("até \(Fmt.size(group.wasted)) a liberar").font(.caption).foregroundStyle(.secondary)
+                        Text(L("até %@ a liberar", Fmt.size(group.wasted))).font(.caption).foregroundStyle(.secondary)
                     }
                 }
             }
@@ -92,16 +96,16 @@ struct DuplicatesView: View {
         .listStyle(.inset)
         .safeAreaInset(edge: .bottom) {
             HStack {
-                Text("\(removable.count) arquivo(s) marcado(s) · até **\(Fmt.size(size))**")
+                Text(LocalizedStringKey(L("%lld arquivo(s) marcado(s) · até **%@**", removable.count, Fmt.size(size))))
                 Spacer()
-                Button("Procurar de novo") {
+                Button(L("Procurar de novo")) {
                     model.duplicates = .idle
                     model.findDuplicates()
                 }
                 Button {
                     Task { await model.trashDuplicates() }
                 } label: {
-                    Label("Mover para a Lixeira", systemImage: "trash")
+                    Label(L("Mover para a Lixeira"), systemImage: "trash")
                 }
                 .buttonStyle(.borderedProminent).disabled(removable.isEmpty || model.isBusy)
             }.padding(.horizontal, 20).padding(.vertical, 10).background(.bar)

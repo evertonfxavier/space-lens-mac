@@ -44,6 +44,11 @@ sed "s/__VERSION__/$VERSION/g" Resources/Info.plist.in > "$APP/Contents/Info.pli
 plutil -lint "$APP/Contents/Info.plist" >/dev/null
 [ -f Resources/AppIcon.icns ] && cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
+# Translations: one <code>.lproj/Localizable.strings per language (the in-app language switch reads them).
+for lproj in Resources/Localization/*.lproj; do
+  cp -R "$lproj" "$APP/Contents/Resources/"
+  plutil -lint "$APP/Contents/Resources/$(basename "$lproj")/Localizable.strings" >/dev/null
+done
 
 codesign --force --options runtime --sign "${SIGN_IDENTITY:--}" "$APP"
 codesign --verify --strict "$APP"

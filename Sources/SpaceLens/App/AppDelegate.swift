@@ -14,7 +14,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 try? FileManager.default.createDirectory(at: sandbox, withIntermediateDirectories: true)
                 model = AppModel(
                     home: sandbox.path, storeDirectory: URL(fileURLWithPath: dir).appendingPathComponent("demo-store"),
-                    startTimers: false)
+                    startTimers: false,
+                    languageOverride: ProcessInfo.processInfo.environment["SPACELENS_LANGUAGE"]
+                        .flatMap { AppLanguage(rawValue: $0) })
                 super.init()
                 return
             }
@@ -30,10 +32,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         buildMainMenu()
-        buildStatusItem()
+        configurePopover()
+        model.$languageRevision.dropFirst().receive(on: RunLoop.main).sink { [weak self] _ in
+            self?.languageChanged()
+        }.store(in: &cancellables)
+        model.$usage.combineLatest(model.$settings).receive(on: RunLoop.main).sink { [weak self] _, _ in
+            self?.refreshStatusItem()
+        }.store(in: &cancellables)
+        // The menu bar item can be switched off in the settings; the first value builds it at launch.
+        let visibility = model.$settings.map(\.showMenuBarItem).removeDuplicates()
+        visibility.receive(on: RunLoop.main).sink { [weak self] visible in
+            self?.setMenuBarItem(visible: visible)
+        }.store(in: &cancellables)
+        visibility.dropFirst().receive(on: RunLoop.main).sink { [weak self] visible in
+            self?.updateActivationPolicy(menuBarVisible: visible)
+        }.store(in: &cancellables)
         if Self.launchedAtLogin {
-            // Started by "open at login": live in the menu bar, no window, no Dock icon.
-            NSApp.setActivationPolicy(.accessory)
+            // Started by "open at login": live in the menu bar, no window, no Dock icon. Without a menu bar item
+            // the Dock icon is the only way back in, so it stays.
+            if model.settings.showMenuBarItem { NSApp.setActivationPolicy(.accessory) }
         } else {
             showMainWindow()
         }
@@ -84,7 +101,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if settingsWindow == nil {
             let controller = NSHostingController(rootView: SettingsView().environmentObject(model))
             let w = NSWindow(contentViewController: controller)
-            w.title = "Ajustes do SpaceLens"
+            w.title = L("Ajustes do SpaceLens")
             w.styleMask = [.titled, .closable]
             w.isReleasedWhenClosed = false
             w.delegate = self
@@ -96,22 +113,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     func windowWillClose(_ notification: Notification) {
-        // Back to a pure menu bar app once no window is left, so the Dock icon does not linger.
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
-            let anyVisible = [self.window, self.settingsWindow].contains { $0?.isVisible == true }
-            if !anyVisible { NSApp.setActivationPolicy(.accessory) }
+            self.updateActivationPolicy(menuBarVisible: self.model.settings.showMenuBarItem)
         }
+    }
+
+    /// A pure menu bar app once no window is left, so the Dock icon does not linger. With the menu bar item
+    /// switched off the app keeps its Dock icon: it would otherwise be unreachable.
+    private func updateActivationPolicy(menuBarVisible: Bool) {
+        let anyVisible = [window, settingsWindow].contains { $0?.isVisible == true }
+        NSApp.setActivationPolicy(menuBarVisible && !anyVisible ? .accessory : .regular)
     }
 
     // MARK: Menu bar
 
-    private func buildStatusItem() {
-        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        statusItem = item
-        item.button?.target = self
-        item.button?.action = #selector(togglePopover(_:))
-        item.button?.setAccessibilityLabel("SpaceLens")
+    private func setMenuBarItem(visible: Bool) {
+        if visible, statusItem == nil {
+            let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+            statusItem = item
+            item.button?.target = self
+            item.button?.action = #selector(togglePopover(_:))
+            item.button?.setAccessibilityLabel("SpaceLens")
+            refreshStatusItem()
+        } else if !visible, let item = statusItem {
+            popover.performClose(nil)
+            NSStatusBar.system.removeStatusItem(item)
+            statusItem = nil
+        }
+    }
+
+    private func configurePopover() {
         popover.behavior = .transient
         let controller = NSHostingController(
             rootView: MenuBarView(
@@ -121,10 +153,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             ).environmentObject(model))
         controller.sizingOptions = .preferredContentSize
         popover.contentViewController = controller
-        model.$usage.combineLatest(model.$settings).receive(on: RunLoop.main).sink { [weak self] _, _ in
-            self?.refreshStatusItem()
-        }.store(in: &cancellables)
-        refreshStatusItem()
     }
 
     func refreshStatusItem() {
@@ -132,7 +160,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let low = model.isLowOnSpace
         let image = NSImage(
             systemSymbolName: low ? "exclamationmark.triangle.fill" : "internaldrive",
-            accessibilityDescription: "Espaço em disco")
+            accessibilityDescription: L("Espaço em disco"))
         image?.isTemplate = true
         button.image = image
         button.imagePosition = .imageLeading
@@ -147,7 +175,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         } else {
             button.attributedTitle = NSAttributedString(string: "")
         }
-        button.toolTip = "SpaceLens · \(model.freeSpaceText) livres"
+        button.toolTip = L("SpaceLens · %@ livres", model.freeSpaceText)
     }
 
     @objc private func togglePopover(_ sender: Any?) {
@@ -159,6 +187,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             popover.contentViewController?.view.window?.makeKey()
         }
+    }
+
+    private func languageChanged() {
+        buildMainMenu()
+        refreshStatusItem()
+        settingsWindow?.title = L("Ajustes do SpaceLens")
     }
 
     // MARK: Main menu
@@ -177,27 +211,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         main.addItem(appItem)
         let app = NSMenu()
         appItem.submenu = app
-        add(app, "Sobre o SpaceLens", #selector(NSApplication.orderFrontStandardAboutPanel(_:)))
+        add(app, L("Sobre o SpaceLens"), #selector(NSApplication.orderFrontStandardAboutPanel(_:)))
         app.addItem(.separator())
-        let settings = app.addItem(withTitle: "Ajustes…", action: #selector(showSettings), keyEquivalent: ",")
+        let settings = app.addItem(withTitle: L("Ajustes…"), action: #selector(showSettings), keyEquivalent: ",")
         settings.target = self
         app.addItem(.separator())
-        add(app, "Ocultar SpaceLens", #selector(NSApplication.hide(_:)), "h")
-        add(app, "Sair do SpaceLens", #selector(NSApplication.terminate(_:)), "q")
+        add(app, L("Ocultar SpaceLens"), #selector(NSApplication.hide(_:)), "h")
+        add(app, L("Sair do SpaceLens"), #selector(NSApplication.terminate(_:)), "q")
 
         let editItem = NSMenuItem()
         main.addItem(editItem)
-        let edit = NSMenu(title: "Editar")
+        let edit = NSMenu(title: L("Editar"))
         editItem.submenu = edit
-        add(edit, "Copiar", #selector(NSText.copy(_:)), "c")
-        add(edit, "Selecionar tudo", #selector(NSText.selectAll(_:)), "a")
+        add(edit, L("Copiar"), #selector(NSText.copy(_:)), "c")
+        add(edit, L("Selecionar tudo"), #selector(NSText.selectAll(_:)), "a")
 
         let windowItem = NSMenuItem()
         main.addItem(windowItem)
-        let windowMenu = NSMenu(title: "Janela")
+        let windowMenu = NSMenu(title: L("Janela"))
         windowItem.submenu = windowMenu
-        add(windowMenu, "Minimizar", #selector(NSWindow.performMiniaturize(_:)), "m")
-        add(windowMenu, "Fechar", #selector(NSWindow.performClose(_:)), "w")
+        add(windowMenu, L("Minimizar"), #selector(NSWindow.performMiniaturize(_:)), "m")
+        add(windowMenu, L("Fechar"), #selector(NSWindow.performClose(_:)), "w")
         let show = windowMenu.addItem(withTitle: "SpaceLens", action: #selector(showMainWindow), keyEquivalent: "0")
         show.target = self
         NSApp.windowsMenu = windowMenu
@@ -213,7 +247,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             Task { @MainActor in
                 try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
                 model.loadDemo()
+                model.fullDiskAccess = true  // the demo has nothing to say about the real permission
+                NSApp.activate(ignoringOtherApps: true)
+                window?.makeKeyAndOrderFront(nil)
+                if ProcessInfo.processInfo.environment["SPACELENS_DEMO_UPDATE"] != nil {
+                    model.availableUpdate = ReleaseInfo(
+                        version: AppVersion("0.2.0")!, tag: "v0.2.0", name: "SpaceLens 0.2.0",
+                        pageURL: URL(string: "https://github.com/evertonfxavier/space-lens-mac/releases/tag/v0.2.0")!,
+                        downloadURL: nil, notes: "", publishedAt: nil)
+                }
                 @MainActor func shot(_ view: NSView?, _ name: String) {
+                    // The real window composited by the window server, so the sidebar selection and the
+                    // translucent materials look like they do on screen. Falls back to a plain view capture.
+                    if let view, let main = window, view === main.contentView {
+                        let number = main.windowNumber
+                        let process = Process()
+                        process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+                        process.arguments = ["-x", "-o", "-l", "\(number)", "\(dir)/\(name).png"]
+                        try? process.run()
+                        process.waitUntilExit()
+                        if process.terminationStatus == 0 { return }
+                    }
                     guard let view, let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
                     view.cacheDisplay(in: view.bounds, to: rep)
                     try? rep.representation(using: .png, properties: [:])?.write(
@@ -222,11 +276,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
                 for pane in Pane.allCases {
                     model.section = pane
+                    model.fullDiskAccess = true
                     try? await Task.sleep(nanoseconds: 900_000_000)
                     shot(window?.contentView, pane.rawValue)
                 }
                 model.section = .explorer
                 model.explorerMap = true
+                model.fullDiskAccess = true
                 try? await Task.sleep(nanoseconds: 900_000_000)
                 shot(window?.contentView, "explorer-map")
 

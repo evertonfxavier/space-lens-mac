@@ -13,9 +13,9 @@ public enum Safety: Int, Codable, Comparable, CaseIterable, Sendable {
 
     public var title: String {
         switch self {
-        case .safe: return "Pode apagar"
-        case .review: return "Revise antes"
-        case .keep: return "Não apague"
+        case .safe: return L("Pode apagar")
+        case .review: return L("Revise antes")
+        case .keep: return L("Não apague")
         }
     }
 }
@@ -26,20 +26,20 @@ public enum Category: String, Codable, CaseIterable, Sendable {
 
     public var title: String {
         switch self {
-        case .caches: return "Caches e Logs"
-        case .developer: return "Desenvolvimento"
-        case .trash: return "Lixeira"
-        case .downloads: return "Downloads"
-        case .media: return "Fotos, Vídeos e Música"
-        case .documents: return "Documentos"
-        case .apps: return "Aplicativos"
-        case .appData: return "Dados de Apps"
-        case .messages: return "Mensagens e E-mail"
-        case .backups: return "Backups"
-        case .virtualization: return "Máquinas Virtuais e Docker"
-        case .cloud: return "Nuvem (iCloud, OneDrive…)"
-        case .system: return "Sistema"
-        case .other: return "Outros"
+        case .caches: return L("Caches e Logs")
+        case .developer: return L("Desenvolvimento")
+        case .trash: return L("Lixeira")
+        case .downloads: return L("Downloads")
+        case .media: return L("Fotos, Vídeos e Música")
+        case .documents: return L("Documentos")
+        case .apps: return L("Aplicativos")
+        case .appData: return L("Dados de Apps")
+        case .messages: return L("Mensagens e E-mail")
+        case .backups: return L("Backups")
+        case .virtualization: return L("Máquinas Virtuais e Docker")
+        case .cloud: return L("Nuvem (iCloud, OneDrive…)")
+        case .system: return L("Sistema")
+        case .other: return L("Outros")
         }
     }
 }
@@ -122,20 +122,23 @@ public struct NodeClass: Sendable, Equatable {
     public var consequence: String?
     public var entryID: String?
 
-    public static let unknown = NodeClass(
-        category: .other, safety: .review, title: nil,
-        explanation:
-            "Arquivos seus ou de um app. O SpaceLens não sabe se podem ser recriados — confira antes de apagar.",
-        consequence: nil, entryID: nil)
+    public static var unknown: NodeClass {
+        NodeClass(
+            category: .other, safety: .review, title: nil,
+            explanation:
+                L("Arquivos seus ou de um app. O SpaceLens não sabe se podem ser recriados — confira antes de apagar."),
+            consequence: nil, entryID: nil)
+    }
 }
 
 public enum ByteFormat {
+    /// Sizes in the interface language ("61,8 GB" in Portuguese and Spanish, "61.8 GB" in English).
     public static func string(_ bytes: Int64) -> String {
-        let f = ByteCountFormatter()
-        f.countStyle = .file
-        f.allowedUnits = [.useKB, .useMB, .useGB, .useTB]
-        f.includesUnit = true
-        f.zeroPadsFractionDigits = false
-        return f.string(fromByteCount: max(0, bytes))
+        let value = max(0, bytes)
+        if value < 1000 { return value == 0 ? "0 KB" : "1 KB" }
+        let style = ByteCountFormatStyle(
+            style: .file, allowedUnits: [.kb, .mb, .gb, .tb], spellsOutZero: false, includesActualByteCount: false,
+            locale: Localizer.shared.locale)
+        return style.format(value).replacingOccurrences(of: "kB", with: "KB")
     }
 }
