@@ -24,7 +24,7 @@ jobs:
       tag: ${{ steps.v.outputs.tag }}
       release: ${{ steps.v.outputs.release }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Read version
         id: v
@@ -54,7 +54,7 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Lint
         run: make lint
