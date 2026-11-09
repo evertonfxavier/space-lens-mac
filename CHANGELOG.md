@@ -3,9 +3,8 @@
 All notable changes are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/).
 
-The release workflow publishes the section whose heading matches the content of the `VERSION` file.
-
-## [Unreleased]
+Sections are written by the release workflow from the Conventional Commits of each release (see CONTRIBUTING.md), and
+`VERSION` is bumped by the same workflow. Nothing here needs to be edited by hand.
 
 ## [0.2.1] - 2026-11-09
 

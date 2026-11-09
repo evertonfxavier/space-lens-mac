@@ -1,6 +1,6 @@
 VERSION := $(shell tr -d '[:space:]' < VERSION)
 
-.PHONY: build run install test format lint check icon snapshots screenshots zip dmg universal release-local clean
+.PHONY: build run install test test-release format lint check icon snapshots screenshots zip dmg universal release-local clean
 
 build:
 	./scripts/build.sh
@@ -20,13 +20,17 @@ install: build
 test:
 	./scripts/test.sh
 
+# The release planner (scripts/release.py): bump rules, changelog, a real throw-away git repository.
+test-release:
+	python3 scripts/test_release.py
+
 format:
 	swift format -i -r Sources Tests
 
 lint:
 	swift format lint --strict -r Sources Tests
 
-check: lint test build
+check: lint test test-release build
 
 icon:
 	./scripts/make-icon.sh

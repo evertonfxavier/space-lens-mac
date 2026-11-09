@@ -1,13 +1,23 @@
 name: Release
 
-# Releases are driven by the VERSION file: merge a change to VERSION (and the matching CHANGELOG.md section)
-# into main and this workflow publishes the GitHub release. Nothing happens if that version already exists.
-# "Run workflow" retries a failed release.
+# Fully automatic. Every push to main is looked at by scripts/release.py, which reads the Conventional Commits since
+# the latest v* tag and decides the next version:
+#   feat -> minor, fix / perf / refactor -> patch, breaking (type! or BREAKING CHANGE) -> major (minor while 0.x)
+#   docs, chore, ci, test, style, build -> no release by themselves
+# When a release is due the workflow writes VERSION and CHANGELOG.md, tests, builds a universal binary, commits the
+# two files back to main ("chore(release): x.y.z [skip ci]") and publishes the GitHub release at that commit.
+# A VERSION that has no tag yet is released as it is, so bumping it by hand still works.
+# "Run workflow" can force a release (patch / minor / major) or retry a failed one.
 on:
   push:
     branches: [main]
-    paths: [VERSION]
   workflow_dispatch:
+    inputs:
+      bump:
+        description: Force a release even if no commit asks for one
+        type: choice
+        options: [none, patch, minor, major]
+        default: none
 
 concurrency:
   group: release
@@ -18,43 +28,51 @@ permissions:
 
 jobs:
   plan:
+    # The release commit pushed by this workflow does not start another run (GITHUB_TOKEN pushes never do), this is
+    # only a second guard.
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.v.outputs.version }}
-      tag: ${{ steps.v.outputs.tag }}
-      release: ${{ steps.v.outputs.release }}
+      release: ${{ steps.plan.outputs.release }}
+      version: ${{ steps.plan.outputs.version }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
-      - name: Read version
-        id: v
+      - name: Release planner tests
+        run: python3 scripts/test_release.py
+
+      - name: Plan
+        id: plan
         env:
-          GH_TOKEN: ${{ github.token }}
+          BUMP: ${{ inputs.bump }}
         run: |
-          VERSION="$(tr -d '[:space:]' < VERSION)"
-          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
-            echo "::error::VERSION '$VERSION' is not semver (x.y.z or x.y.z-suffix)"; exit 1
-          fi
-          TAG="v$VERSION"
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "Release $TAG already exists: nothing to do."
-            echo "release=false" >> "$GITHUB_OUTPUT"
-          else
-            if ! grep -qF "## [$VERSION]" CHANGELOG.md; then
-              echo "::error::CHANGELOG.md has no '## [$VERSION]' section"; exit 1
-            fi
-            echo "release=true" >> "$GITHUB_OUTPUT"
-          fi
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          args=()
+          if [ -n "${BUMP:-}" ] && [ "$BUMP" != "none" ]; then args+=(--bump "$BUMP"); fi
+          python3 scripts/release.py plan ${args[@]+"${args[@]}"} | tee plan.txt
+          cat plan.txt >> "$GITHUB_OUTPUT"
+          {
+            echo "### Release plan"
+            echo '```'
+            cat plan.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   release:
     needs: plan
     if: needs.plan.outputs.release == 'true'
     runs-on: macos-latest
     timeout-minutes: 45
+    env:
+      VERSION: ${{ needs.plan.outputs.version }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Write VERSION and CHANGELOG
+        run: python3 scripts/release.py apply --version "$VERSION" --notes notes.md
 
       - name: Lint
         run: make lint
@@ -74,35 +92,23 @@ jobs:
       - name: Package
         run: ./scripts/package.sh all
 
-      - name: Release notes
-        env:
-          VERSION: ${{ needs.plan.outputs.version }}
+      - name: Commit VERSION and CHANGELOG
         run: |
-          awk -v h="## [$VERSION]" 'index($0,"## [")==1 { p = (index($0,h)==1); next } p' CHANGELOG.md > notes.md
-          cat >> notes.md <<EOF
-
-          ## Install
-
-          1. Download \`SpaceLens-$VERSION.dmg\` (or the zip) and drag **SpaceLens** to Applications.
-          2. The app is not notarized. On first launch macOS may say it cannot be opened: go to
-             **System Settings → Privacy & Security → Open Anyway**, or run
-             \`xattr -dr com.apple.quarantine /Applications/SpaceLens.app\`.
-          3. Grant **Full Disk Access** (System Settings → Privacy & Security) to see Mail, Messages, Safari and the Trash.
-
-          Universal binary (Apple silicon + Intel), macOS 14 or later. Verify downloads with \`SHA256SUMS.txt\`.
-          EOF
-          cat notes.md
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- VERSION CHANGELOG.md; then
+            echo "VERSION and CHANGELOG already up to date."
+          else
+            git add VERSION CHANGELOG.md
+            git commit -m "chore(release): $VERSION [skip ci]"
+            git push origin HEAD:main
+          fi
 
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ needs.plan.outputs.version }}
-          TAG: ${{ needs.plan.outputs.tag }}
         run: |
-          flags=()
-          if [[ "$VERSION" == *-* ]]; then flags+=(--prerelease); fi
-          gh release create "$TAG" build/dist/* \
-            --target "$GITHUB_SHA" \
+          gh release create "v$VERSION" build/dist/* \
+            --target "$(git rev-parse HEAD)" \
             --title "SpaceLens $VERSION" \
-            --notes-file notes.md \
-            ${flags[@]+"${flags[@]}"}
+            --notes-file notes.md

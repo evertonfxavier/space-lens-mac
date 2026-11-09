@@ -28,6 +28,9 @@ jobs:
       - name: Lint
         run: make lint
 
+      - name: Release planner tests
+        run: make test-release
+
       - name: Test
         run: make test
 

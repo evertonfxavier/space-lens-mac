@@ -22,7 +22,8 @@ make snapshots  # screenshots with demo data in build/snapshots
 2. Add or update tests for anything under `Sources/SpaceLens/Core`. The tests use real temporary directories, not
    mocks of the file system.
 3. Run `make check`.
-4. Add a line to `CHANGELOG.md` under `## [Unreleased]`.
+4. Write the commit (or the PR title, when squash-merging) as a [Conventional Commit](https://www.conventionalcommits.org):
+   `feat: …`, `fix: …`, `docs: …`. It decides the next version, see *Releasing* below.
 5. Open a pull request.
 
 ## Ground rules
@@ -45,8 +46,24 @@ make snapshots  # screenshots with demo data in build/snapshots
    and the `resolve` rule), and list the language in `CFBundleLocalizations` in `Resources/Info.plist.in`.
 3. Add the code to the language list in `Tests/LocalizationTests.swift` and run `make check`.
 
-## Releasing (maintainers)
+## Releasing
 
-Releases are automatic. Update `VERSION` and `CHANGELOG.md` (a `## [x.y.z]` section is required) and merge to
-`main`. The *Release* workflow tests, builds a universal binary and publishes the GitHub release with the zip, the
-dmg and `SHA256SUMS.txt`. If the release already exists for that version, nothing happens.
+Releases are automatic: nobody edits `VERSION` or `CHANGELOG.md` by hand. On every push to `main` the *Release*
+workflow runs `scripts/release.py`, which reads the commits since the latest `v*` tag:
+
+| Commit | Next version |
+|---|---|
+| `feat: …` | minor (`0.2.1` → `0.3.0`) |
+| `fix: …`, `perf: …`, `refactor: …` | patch (`0.2.1` → `0.2.2`) |
+| `feat!: …`, or `BREAKING CHANGE:` in the body | major (minor while the version is still `0.x`) |
+| `docs`, `chore`, `ci`, `test`, `style`, `build` | no release on their own |
+
+The highest bump wins. When a release is due the workflow writes `VERSION` and the new `CHANGELOG.md` section from the
+commit messages, runs lint and the tests, builds a universal binary, commits the two files back to `main`
+(`chore(release): x.y.z [skip ci]`) and publishes the GitHub release with the zip, the dmg and `SHA256SUMS.txt`.
+
+- *Actions → Release → Run workflow* forces a patch, minor or major release (or retries a failed one).
+- Setting `VERSION` by hand to a version that has no tag still releases exactly that version.
+- The workflow pushes to `main` with the built-in token, so branch protection on `main` has to allow it (or the
+  release commit step has to move to a pull request).
+- `make test-release` runs the planner's tests against throw-away git repositories.

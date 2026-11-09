@@ -93,4 +93,4 @@ Baixe o `.dmg` em [Releases](https://github.com/evertonfxavier/space-lens-mac/re
 
 ## Releases
 
-Automáticas: altere `VERSION`, adicione a seção `## [x.y.z]` no `CHANGELOG.md` e faça merge na `main`. O workflow *Release* testa, compila um binário universal e publica a release com dmg, zip e `SHA256SUMS.txt`.
+Totalmente automáticas. Cada push na `main` é lido pelo workflow *Release*: commits `feat:` sobem a versão minor, `fix:` / `perf:` / `refactor:` a patch, mudanças que quebram compatibilidade a major, e `docs:` / `chore:` / `ci:` / `test:` não geram release. Quando há release, ele atualiza o `VERSION` e o `CHANGELOG.md` a partir das mensagens de commit, testa, compila um binário universal e publica a release com dmg, zip e `SHA256SUMS.txt`. Detalhes em [CONTRIBUTING.md](CONTRIBUTING.md#releasing).

@@ -104,7 +104,7 @@ scripts/     build, test, package, icon
 
 ## Releases
 
-Fully automated. Bump `VERSION`, add the `## [x.y.z]` section to [CHANGELOG.md](CHANGELOG.md) and merge to `main`: the [Release workflow](.github/workflows/release.yml) tests, builds a universal binary and publishes the GitHub release with the dmg, the zip and `SHA256SUMS.txt`.
+Fully automatic. Every push to `main` is read by the [Release workflow](.github/workflows/release.yml): `feat:` commits bump the minor version, `fix:` / `perf:` / `refactor:` the patch, breaking changes the major, and `docs:` / `chore:` / `ci:` / `test:` release nothing. When a release is due it updates `VERSION` and [CHANGELOG.md](CHANGELOG.md) from the commit messages, tests, builds a universal binary and publishes the GitHub release with the dmg, the zip and `SHA256SUMS.txt`. Details in [CONTRIBUTING.md](CONTRIBUTING.md#releasing).
 
 ## Contributing
 
