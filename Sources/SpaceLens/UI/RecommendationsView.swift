@@ -13,13 +13,17 @@ struct RecommendationsView: View {
         } else {
             List {
                 legend
+                selectAllBar
                 ForEach([Safety.safe, .review], id: \.self) { safety in
                     let recs = model.recommendations.filter { $0.safety == safety }
                     if !recs.isEmpty {
                         SwiftUI.Section {
                             ForEach(recs) { rec in RecommendationRow(rec: rec, isExpanded: binding(rec.id)) }
                         } header: {
-                            HStack(spacing: 6) {
+                            HStack(spacing: 8) {
+                                SelectionBox(state: model.checkState(recs)) {
+                                    model.selectAll(recs, model.checkState(recs) != .all)
+                                }
                                 Image(systemName: safety.icon).foregroundStyle(safety.color)
                                 Text(safety == .safe ? L("Pode apagar com segurança") : L("Revise antes de apagar"))
                                     .font(.headline)
@@ -31,6 +35,21 @@ struct RecommendationsView: View {
             .listStyle(.inset)
             .safeAreaInset(edge: .bottom) { footer }
         }
+    }
+
+    /// One checkbox for everything: ticks or clears every item of every recommendation.
+    private var selectAllBar: some View {
+        let recs = model.recommendations
+        let counts = model.pickedCount(recs)
+        return HStack(spacing: 10) {
+            SelectionBox(state: model.checkState(recs)) { model.selectAll(recs, model.checkState(recs) != .all) }
+            Text(L("Marcar tudo")).font(.callout.weight(.medium))
+            Spacer()
+            Text(L("%lld de %lld itens marcados", counts.picked, counts.total))
+                .font(.caption).foregroundStyle(.secondary).monospacedDigit()
+        }
+        .padding(.vertical, 4)
+        .listRowSeparator(.hidden)
     }
 
     private var legend: some View {
@@ -62,6 +81,31 @@ struct RecommendationsView: View {
             .buttonStyle(.borderedProminent).disabled(quick == 0 || model.isBusy)
         }
         .padding(.horizontal, 20).padding(.vertical, 10).background(.bar)
+    }
+}
+
+/// A checkbox that can also show "some": ticked, dashed or empty. Clicking ticks everything unless everything is
+/// already ticked.
+struct SelectionBox: View {
+    var state: CheckState
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: symbol).font(.title3)
+                .foregroundStyle(state == .none ? Color.secondary : Color.accentColor)
+        }
+        .buttonStyle(.plain)
+        .help(state == .all ? L("Desmarcar") : L("Marcar todos"))
+        .accessibilityLabel(state == .all ? L("Desmarcar") : L("Marcar todos"))
+    }
+
+    private var symbol: String {
+        switch state {
+        case .none: return "square"
+        case .some: return "minus.square.fill"
+        case .all: return "checkmark.square.fill"
+        }
     }
 }
 
@@ -107,6 +151,8 @@ struct RecommendationRow: View {
 
     private var header: some View {
         HStack(alignment: .top, spacing: 12) {
+            SelectionBox(state: model.checkState([rec])) { model.selectAll(rec, model.checkState([rec]) != .all) }
+                .padding(.top, 2)
             Image(systemName: rec.category.icon).font(.title3).foregroundStyle(rec.category.color).frame(width: 28)
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {

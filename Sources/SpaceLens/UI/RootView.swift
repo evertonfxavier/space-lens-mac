@@ -6,10 +6,15 @@ struct RootView: View {
     var body: some View {
         NavigationSplitView {
             List(selection: Binding<Pane?>(get: { model.section }, set: { if let s = $0 { model.section = s } })) {
-                ForEach(Pane.allCases) { pane in
+                ForEach(Pane.main) { pane in
                     Label(pane.title, systemImage: pane.icon)
                         .badge(badge(for: pane))
                         .tag(pane)
+                }
+                SwiftUI.Section {
+                    ForEach(Pane.secondary) { pane in
+                        Label(pane.title, systemImage: pane.icon).tag(pane)
+                    }
                 }
             }
             .navigationSplitViewColumnWidth(min: 190, ideal: 210, max: 250)
@@ -44,6 +49,8 @@ struct RootView: View {
         case .duplicates: DuplicatesView()
         case .routines: RoutinesView()
         case .history: HistoryView()
+        case .settings: SettingsView()
+        case .about: AboutView()
         }
     }
 

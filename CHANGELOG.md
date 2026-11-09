@@ -18,6 +18,12 @@ The release workflow publishes the section whose heading matches the content of 
 - Update notice: the app checks the GitHub releases API once a day (can be turned off) and shows a banner in the
   window and a row in the menu bar panel when a newer release exists. "Check now" in Settings. Nothing is installed
   automatically; Download opens the installer in the browser.
+- Settings and About are now panes of the main window (sidebar). The separate settings window is gone; ⌘, and the
+  menu bar panel open the pane. About shows the version, what the app promises, the update check, system info, links
+  and a "copy info for support" button.
+- Recommendations: tick or clear everything, a whole safety group, or one recommendation with a checkbox.
+- Categories: tick items, trash a whole group or a single item (always to the Trash, through the safety guard).
+- Duplicates: tick or clear everything or one group; the oldest copy of each group stays.
 - README screenshots in English and Portuguese, regenerated with `make screenshots`.
 
 ### Changed

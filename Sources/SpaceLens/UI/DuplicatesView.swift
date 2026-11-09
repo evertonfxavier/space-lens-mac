@@ -37,6 +37,44 @@ struct DuplicatesView: View {
         }
     }
 
+    /// "All" means every copy except the oldest of each group, which is the one that stays. Anything in between,
+    /// like keeping a different copy, shows as "some".
+    private func checkState(_ groups: [DuplicateGroup]) -> CheckState {
+        let ticked = groups.reduce(0) { $0 + $1.files.filter { model.duplicateSelection.contains($0.path) }.count }
+        if ticked == 0 { return .none }
+        let exact = groups.allSatisfy { group in
+            group.files.enumerated().allSatisfy { index, file in
+                model.duplicateSelection.contains(file.path) == (index > 0)
+            }
+        }
+        return exact ? .all : .some
+    }
+
+    private func setAll(_ groups: [DuplicateGroup], _ on: Bool) {
+        for group in groups {
+            for (index, file) in group.files.enumerated() {
+                if on && index > 0 {
+                    model.duplicateSelection.insert(file.path)
+                } else {
+                    model.duplicateSelection.remove(file.path)
+                }
+            }
+        }
+    }
+
+    private func selectAllBar(_ groups: [DuplicateGroup]) -> some View {
+        let candidates = groups.reduce(0) { $0 + max(0, $1.files.count - 1) }
+        let ticked = groups.reduce(0) { $0 + $1.removable(selected: model.duplicateSelection).count }
+        return HStack(spacing: 10) {
+            SelectionBox(state: checkState(groups)) { setAll(groups, checkState(groups) != .all) }
+            Text(L("Marcar tudo")).font(.callout.weight(.medium))
+            Spacer()
+            Text(L("%lld de %lld itens marcados", ticked, candidates))
+                .font(.caption).foregroundStyle(.secondary).monospacedDigit()
+        }
+        .padding(.vertical, 4).listRowSeparator(.hidden)
+    }
+
     private func results(_ groups: [DuplicateGroup]) -> some View {
         let removable = groups.flatMap { $0.removable(selected: model.duplicateSelection) }
         let size = groups.reduce(Int64(0)) { total, group in
@@ -49,6 +87,7 @@ struct DuplicatesView: View {
                 )
             )
             .font(.callout).foregroundStyle(.secondary).listRowSeparator(.hidden)
+            selectAllBar(groups)
             ForEach(groups) { group in
                 SwiftUI.Section {
                     ForEach(Array(group.files.enumerated()), id: \.element.id) { index, file in
@@ -85,7 +124,8 @@ struct DuplicatesView: View {
                         }
                     }
                 } header: {
-                    HStack {
+                    HStack(spacing: 8) {
+                        SelectionBox(state: checkState([group])) { setAll([group], checkState([group]) != .all) }
                         Text(L("%lld cópias de %@", group.files.count, Fmt.size(group.size))).font(.headline)
                         Spacer()
                         Text(L("até %@ a liberar", Fmt.size(group.wasted))).font(.caption).foregroundStyle(.secondary)

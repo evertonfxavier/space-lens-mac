@@ -25,7 +25,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         super.init()
     }
     private(set) var window: NSWindow?
-    private var settingsWindow: NSWindow?
     private var statusItem: NSStatusItem?
     private let popover = NSPopover()
     private var cancellables = Set<AnyCancellable>()
@@ -95,21 +94,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         window?.makeKeyAndOrderFront(nil)
     }
 
-    @objc func showSettings() {
-        popover.performClose(nil)
-        NSApp.setActivationPolicy(.regular)
-        if settingsWindow == nil {
-            let controller = NSHostingController(rootView: SettingsView().environmentObject(model))
-            let w = NSWindow(contentViewController: controller)
-            w.title = L("Ajustes do SpaceLens")
-            w.styleMask = [.titled, .closable]
-            w.isReleasedWhenClosed = false
-            w.delegate = self
-            w.center()
-            settingsWindow = w
-        }
-        NSApp.activate(ignoringOtherApps: true)
-        settingsWindow?.makeKeyAndOrderFront(nil)
+    /// Settings and About are panes of the main window, so the menu bar panel, ⌘, and the app menu all land there.
+    @objc func showSettings() { show(.settings) }
+
+    @objc func showAbout() { show(.about) }
+
+    private func show(_ pane: Pane) {
+        model.section = pane
+        showMainWindow()
     }
 
     func windowWillClose(_ notification: Notification) {
@@ -122,7 +114,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     /// A pure menu bar app once no window is left, so the Dock icon does not linger. With the menu bar item
     /// switched off the app keeps its Dock icon: it would otherwise be unreachable.
     private func updateActivationPolicy(menuBarVisible: Bool) {
-        let anyVisible = [window, settingsWindow].contains { $0?.isVisible == true }
+        let anyVisible = window?.isVisible == true
         NSApp.setActivationPolicy(menuBarVisible && !anyVisible ? .accessory : .regular)
     }
 
@@ -192,7 +184,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private func languageChanged() {
         buildMainMenu()
         refreshStatusItem()
-        settingsWindow?.title = L("Ajustes do SpaceLens")
     }
 
     // MARK: Main menu
@@ -211,7 +202,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         main.addItem(appItem)
         let app = NSMenu()
         appItem.submenu = app
-        add(app, L("Sobre o SpaceLens"), #selector(NSApplication.orderFrontStandardAboutPanel(_:)))
+        let about = app.addItem(withTitle: L("Sobre o SpaceLens"), action: #selector(showAbout), keyEquivalent: "")
+        about.target = self
         app.addItem(.separator())
         let settings = app.addItem(withTitle: L("Ajustes…"), action: #selector(showSettings), keyEquivalent: ",")
         settings.target = self
@@ -299,15 +291,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 try? await Task.sleep(nanoseconds: 400_000_000)
                 shot(hosting, "menubar")
 
-                let settings = NSHostingView(rootView: SettingsView().environmentObject(model))
-                let ssize = settings.fittingSize
-                let sw = NSWindow(
-                    contentRect: NSRect(origin: .zero, size: ssize), styleMask: [.titled], backing: .buffered,
-                    defer: false)
-                sw.contentView = settings
-                sw.orderBack(nil)
-                try? await Task.sleep(nanoseconds: 400_000_000)
-                shot(settings, "settings")
                 NSApp.terminate(nil)
             }
         }

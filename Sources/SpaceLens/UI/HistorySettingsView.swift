@@ -129,18 +129,10 @@ struct SettingsView: View {
                 )
                 .font(.caption).foregroundStyle(.secondary)
             }
-            SwiftUI.Section(L("Sobre")) {
-                LabeledContent(
-                    L("Versão"),
-                    value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
-                )
-                LabeledContent(L("Dados em"), value: "~/Library/Application Support/SpaceLens")
-            }
         }
         .formStyle(.grouped)
-        .frame(width: 560)
-        .padding(.vertical, 8)
-        .id(model.languageRevision)
+        .frame(maxWidth: 720)
+        .frame(maxWidth: .infinity)
     }
 
     @ViewBuilder private var updateStatusLabel: some View {

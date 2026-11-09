@@ -4,9 +4,13 @@ import ServiceManagement
 import SwiftUI
 
 enum Pane: String, CaseIterable, Identifiable {
-    case overview, recommendations, categories, explorer, duplicates, routines, history
+    case overview, recommendations, categories, explorer, duplicates, routines, history, settings, about
 
     var id: String { rawValue }
+
+    /// The panes of the first sidebar group; settings and about live in a second one below.
+    static let main: [Pane] = [.overview, .recommendations, .categories, .explorer, .duplicates, .routines, .history]
+    static let secondary: [Pane] = [.settings, .about]
 
     var title: String {
         switch self {
@@ -17,6 +21,8 @@ enum Pane: String, CaseIterable, Identifiable {
         case .duplicates: return L("Duplicados")
         case .routines: return L("Rotinas")
         case .history: return L("Histórico")
+        case .settings: return L("Ajustes")
+        case .about: return L("Sobre")
         }
     }
 
@@ -29,6 +35,8 @@ enum Pane: String, CaseIterable, Identifiable {
         case .duplicates: return "doc.on.doc"
         case .routines: return "clock.arrow.2.circlepath"
         case .history: return "list.bullet.rectangle"
+        case .settings: return "gearshape"
+        case .about: return "info.circle"
         }
     }
 }
@@ -38,6 +46,8 @@ enum ScanPhase: Equatable {
     case scanning(items: Int, bytes: Int64, path: String)
     case analyzing
 }
+
+enum CheckState { case none, some, all }
 
 enum UpdateStatus: Equatable {
     case idle
@@ -82,6 +92,8 @@ final class AppModel: ObservableObject {
     @Published var focusedCategory: Category?
     @Published var explorerMap = false
     @Published var expandedRecs: Set<String> = []
+    /// Paths ticked on the Categories screen (only ever things you picked yourself: they go to the Trash).
+    @Published var categorySelection: Set<String> = []
     /// Bumps when the interface language changes so every view builds its texts again.
     @Published var languageRevision = 0
     /// The newest GitHub release when it is newer than this build (even if its banner was dismissed).
@@ -179,8 +191,10 @@ final class AppModel: ObservableObject {
 
     func nodeClass(_ node: FileNode) -> NodeClass { analyzer?.classify(node) ?? .unknown }
 
-    func trashVerdict(_ node: FileNode) -> SafetyGuard.Verdict {
-        guardrail.check(node.path, mode: .trash, origin: .manual)
+    func trashVerdict(_ node: FileNode) -> SafetyGuard.Verdict { trashVerdict(path: node.path) }
+
+    func trashVerdict(path: String) -> SafetyGuard.Verdict {
+        guardrail.check(path, mode: .trash, origin: .manual)
     }
 
     // MARK: - Scanning
@@ -244,6 +258,7 @@ final class AppModel: ObservableObject {
         self.duplicates = .idle
         self.duplicateSelection = []
         self.explorerPath = nil
+        self.categorySelection = []
         let summary = ScanSummary(result: result, analysis: analysis, scope: settings.scope)
         self.summary = summary
         summaryStore.save(summary)
@@ -268,6 +283,22 @@ final class AppModel: ObservableObject {
 
     func selectAll(_ rec: Recommendation, _ on: Bool) {
         selection[rec.id] = on ? Set(rec.items.map(\.path)) : []
+    }
+
+    /// Several recommendations at once: everything, one safety group or one row.
+    func selectAll(_ recs: [Recommendation], _ on: Bool) {
+        for rec in recs { selectAll(rec, on) }
+    }
+
+    func checkState(_ recs: [Recommendation]) -> CheckState {
+        let total = recs.reduce(0) { $0 + $1.items.count }
+        let picked = recs.reduce(0) { $0 + selectedItems($1).count }
+        if picked == 0 { return .none }
+        return picked == total ? .all : .some
+    }
+
+    func pickedCount(_ recs: [Recommendation]) -> (picked: Int, total: Int) {
+        (recs.reduce(0) { $0 + selectedItems($1).count }, recs.reduce(0) { $0 + $1.items.count })
     }
 
     // MARK: - Cleaning
@@ -358,8 +389,12 @@ final class AppModel: ObservableObject {
     }
 
     func trashManually(_ nodes: [FileNode]) async {
-        guard !nodes.isEmpty, !isBusy else { return }
-        let items = nodes.map { CleanupItem(path: $0.path, size: $0.size, modified: $0.modified) }
+        await trashItems(nodes.map { CleanupItem(path: $0.path, size: $0.size, modified: $0.modified) })
+    }
+
+    /// Things you picked yourself (explorer, categories): Trash only, every path through the safety guard.
+    func trashItems(_ items: [CleanupItem]) async {
+        guard !items.isEmpty, !isBusy else { return }
         let size = items.reduce(0) { $0 + $1.size }
         guard await confirm(L("Confirme para mover %@ para a Lixeira.", ByteFormat.string(size)), details: nil) else {
             return
@@ -369,8 +404,23 @@ final class AppModel: ObservableObject {
         busyMessage = nil
         usage = DiskInfo.current()
         analysisIsStale = analysisIsStale || result.removedCount > 0
+        forget(Set(result.removedPaths))
         report = CleaningReport(title: L("Mover para a Lixeira"), result: result)
         record(manual: L("Mover para a Lixeira"), result)
+    }
+
+    /// Drops trashed items from the Categories lists and totals right away, so they do not linger until the next scan.
+    private func forget(_ gone: Set<String>) {
+        categorySelection.subtract(gone)
+        guard !gone.isEmpty, var current = analysis else { return }
+        for category in Array(current.topItems.keys) {
+            let removed = current.topItems[category, default: []].filter { gone.contains($0.path) }
+            guard !removed.isEmpty else { continue }
+            current.topItems[category]?.removeAll { gone.contains($0.path) }
+            current.categoryBytes[category, default: 0] = max(
+                0, current.categoryBytes[category, default: 0] - removed.reduce(0) { $0 + $1.size })
+        }
+        analysis = current
     }
 
     private func applyCleaning(_ result: CleanupResult, to recs: [Recommendation]) {
