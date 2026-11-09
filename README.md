@@ -1,8 +1,14 @@
-# SpaceLens
+<p align="center">
+  <img src="docs/logo.png" width="160" alt="SpaceLens logo">
+</p>
 
-[![CI](https://github.com/evertonfxavier/space-lens-mac/actions/workflows/ci.yml/badge.svg)](https://github.com/evertonfxavier/space-lens-mac/actions/workflows/ci.yml)
-[![Latest release](https://img.shields.io/github/v/release/evertonfxavier/space-lens-mac)](https://github.com/evertonfxavier/space-lens-mac/releases/latest)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+<h1 align="center">SpaceLens</h1>
+
+<p align="center">
+  <a href="https://github.com/evertonfxavier/space-lens-mac/actions/workflows/ci.yml"><img src="https://github.com/evertonfxavier/space-lens-mac/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/evertonfxavier/space-lens-mac/releases/latest"><img src="https://img.shields.io/github/v/release/evertonfxavier/space-lens-mac" alt="Latest release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+</p>
 
 A native macOS app (SwiftUI + AppKit) that shows **what is using your storage**, tells you **what you can and cannot delete**, groups everything **by category**, runs **scheduled cleanups** and lives in the **menu bar**.
 One app, two faces: the main window and a menu bar item (free space next to the icon, red when it runs low).

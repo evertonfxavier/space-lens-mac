@@ -1,4 +1,8 @@
-# SpaceLens
+<p align="center">
+  <img src="docs/logo.png" width="160" alt="Logo do SpaceLens">
+</p>
+
+<h1 align="center">SpaceLens</h1>
 
 > 🇺🇸 [Read in English](README.md)
 
